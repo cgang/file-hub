@@ -1,0 +1,31 @@
+# Cline AI Assistant Directives
+
+## Code Style & Standards
+- Follow idiomatic Go conventions (gofmt, godoc)
+- Use Go modules for dependency management
+- Prefer clear, readable code over clever optimizations
+- Follow project-specific coding standards in CONTRIBUTING.md
+
+## Contribution Guidelines
+- Focus on core functionality: file synchronization and storage
+- Use standard Go libraries where possible
+- Optimize for readability and maintainability
+- Prioritize Linux-specific optimizations and features
+
+## Code Review Instructions
+- Check for proper error handling (multi-value returns, wrapping)
+- Identify goroutine leak risks and channel misuse
+- Suggest improvements for concurrency patterns
+- Verify proper file handling with os/io packages
+
+## Documentation Requirements
+- Maintain API documentation with Godoc
+- Explain synchronization algorithms clearly
+- Document performance considerations
+- Keep configuration documentation current
+
+## Error Handling
+- Emphasize proper error wrapping and handling
+- Suggest appropriate logging with structured logging
+- Identify edge cases in network operations
+- Review deferred cleanup patterns

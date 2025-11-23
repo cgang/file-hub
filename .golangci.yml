@@ -1,0 +1,19 @@
+version: "2"
+linters:
+  enable:
+    - govet
+    - revive
+    - misspell
+formatters:
+  enable:
+    - gofmt
+    - goimports
+options:
+  run:
+    timeout: 5m
+    skip-dirs:
+      - "test"
+      - "scripts"
+      - "web"
+    skip-files:
+      - ".*_test.go"
