@@ -3,6 +3,8 @@ package db
 import (
 	"fmt"
 	"time"
+
+	"github.com/go-pg/pg/v10"
 )
 
 // CreateUser creates a new user in the database
@@ -40,7 +42,7 @@ func (d *DB) GetUserByID(id int) (*User, error) {
 		Select()
 
 	if err != nil {
-		if err.Error() == "pg: no rows in result set" { // go-pg error for no rows
+		if err == pg.ErrNoRows {
 			return nil, fmt.Errorf("user not found")
 		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
@@ -57,7 +59,7 @@ func (d *DB) GetUserByUsername(username string) (*User, error) {
 		Select()
 
 	if err != nil {
-		if err.Error() == "pg: no rows in result set" {
+		if err == pg.ErrNoRows {
 			return nil, fmt.Errorf("user not found")
 		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
@@ -74,7 +76,7 @@ func (d *DB) GetUserByEmail(email string) (*User, error) {
 		Select()
 
 	if err != nil {
-		if err.Error() == "pg: no rows in result set" {
+		if err == pg.ErrNoRows {
 			return nil, fmt.Errorf("user not found")
 		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
@@ -99,7 +101,7 @@ func (d *DB) UpdateUser(id int, update *UserUpdate) error {
 	// Get the existing user first
 	err := d.Model(user).Where("id = ?id").Select()
 	if err != nil {
-		if err.Error() == "pg: no rows in result set" {
+		if err == pg.ErrNoRows {
 			return fmt.Errorf("user not found")
 		}
 		return fmt.Errorf("failed to get user: %w", err)

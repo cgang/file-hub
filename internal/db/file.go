@@ -3,6 +3,8 @@ package db
 import (
 	"fmt"
 	"time"
+
+	"github.com/go-pg/pg/v10"
 )
 
 // CreateFile creates a new file record in the database
@@ -27,7 +29,7 @@ func (d *DB) GetFileByID(id int) (*File, error) {
 		Select()
 
 	if err != nil {
-		if err.Error() == "pg: no rows in result set" {
+		if err == pg.ErrNoRows {
 			return nil, fmt.Errorf("file not found")
 		}
 		return nil, fmt.Errorf("failed to get file: %w", err)
@@ -44,7 +46,7 @@ func (d *DB) GetFileByPath(path string, userID int) (*File, error) {
 		Select()
 
 	if err != nil {
-		if err.Error() == "pg: no rows in result set" {
+		if err == pg.ErrNoRows {
 			return nil, fmt.Errorf("file not found")
 		}
 		return nil, fmt.Errorf("failed to get file: %w", err)
@@ -107,7 +109,7 @@ func (d *DB) UpdateFile(id int, update *FileUpdate) error {
 	// Get the existing file first
 	err := d.Model(file).Where("id = ?id").Select()
 	if err != nil {
-		if err.Error() == "pg: no rows in result set" {
+		if err == pg.ErrNoRows {
 			return fmt.Errorf("file not found")
 		}
 		return fmt.Errorf("failed to get file: %w", err)

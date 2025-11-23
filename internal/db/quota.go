@@ -3,6 +3,8 @@ package db
 import (
 	"fmt"
 	"time"
+
+	"github.com/go-pg/pg/v10"
 )
 
 // GetUserQuota retrieves the storage quota for a user
@@ -13,7 +15,7 @@ func (d *DB) GetUserQuota(userID int) (*UserQuota, error) {
 		Select()
 
 	if err != nil {
-		if err.Error() == "pg: no rows in result set" {
+		if err == pg.ErrNoRows {
 			return nil, fmt.Errorf("quota record not found for user %d", userID)
 		}
 		return nil, fmt.Errorf("failed to get user quota: %w", err)
@@ -49,7 +51,7 @@ func (d *DB) GetUserQuotaUsage(userID int) (int64, error) {
 		Select(&usedBytes)
 
 	if err != nil {
-		if err.Error() == "pg: no rows in result set" {
+		if err == pg.ErrNoRows {
 			return 0, fmt.Errorf("quota record not found for user %d", userID)
 		}
 		return 0, fmt.Errorf("failed to get user quota usage: %w", err)

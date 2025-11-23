@@ -2,7 +2,12 @@ package db
 
 import (
 	"time"
+
+	"github.com/go-pg/pg/v10"
 )
+
+// ErrNoRows is returned when a query returns no rows
+var ErrNoRows = pg.ErrNoRows
 
 // User represents a user in the system
 type User struct {
