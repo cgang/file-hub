@@ -1,4 +1,4 @@
-# Cline AI Assistant Directives
+# File Hub AI Assistant Directives
 
 ## Code Style & Standards
 - Follow idiomatic Go conventions (gofmt, godoc)
@@ -7,7 +7,7 @@
 - Follow project-specific coding standards in CONTRIBUTING.md
 
 ## Contribution Guidelines
-- Focus on core functionality: file synchronization and storage
+- Focus on core functionality: file synchronization and storage for personal use
 - Use standard Go libraries where possible
 - Optimize for readability and maintainability
 - Prioritize Linux-specific optimizations and features

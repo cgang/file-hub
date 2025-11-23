@@ -1,4 +1,4 @@
-# Contributing to Cline File Sync Service
+# Contributing to File Hub - Personal File Sync Service
 
 ## Getting Started
 Before contributing, please read the [Go Proverbs](https://go-proverbs.github.io/) and familiarize yourself with Go community conventions. We follow Go's project layout standards and engineering philosophy for overall architecture.
