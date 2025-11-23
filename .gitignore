@@ -28,6 +28,13 @@ go.work.sum
 # env file
 .env
 
+# Web UI build output
+dist/
+web/dist/
+web/node_modules/
+web/.svelte-kit/
+web/.vite/
+
 # Editor/IDE
 # .idea/
 # .vscode/

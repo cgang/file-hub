@@ -44,8 +44,27 @@ cd file-hub
 createdb filehub
 psql -d filehub -f scripts/database_schema.sql
 
-# Run service
-make run
+# Build and run the integrated service (backend + frontend in single binary)
+make build
+./bin/file-hub
+```
+
+## 🌐 Integrated Web UI
+The project features a modern web UI built with Svelte that is embedded directly in the binary. The single binary serves both the WebDAV API and the web interface:
+
+- **Web UI**: Accessible at `http://localhost:8080` (or your configured host/port)
+- **WebDAV API**: Available at `http://localhost:8080/webdav`
+
+For development:
+```bash
+# Install web UI dependencies
+make web-install
+
+# Run web UI in development mode (separate from backend)
+make web-dev
+
+# Build frontend assets into the binary
+make build
 ```
 
 ## 💡 Contributing

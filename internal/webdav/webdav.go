@@ -60,8 +60,9 @@ func NewFromConfig(webdavConfig config.WebDAVConfig, storage stor.Storage, stora
 
 // SetupRoutes configures the WebDAV routes
 func (s *WebDAVServer) SetupRoutes() {
-	// Add middleware to handle WebDAV preflight requests
-	s.Use(func(c *gin.Context) {
+	// Create a group for WebDAV routes to avoid conflicts with frontend
+	v1 := s.Group("/webdav")
+	v1.Use(func(c *gin.Context) {
 		if c.Request.Method == "PROPFIND" {
 			c.Header("DAV", "1")
 			c.Header("Content-Type", "application/xml; charset=utf-8")
@@ -70,15 +71,15 @@ func (s *WebDAVServer) SetupRoutes() {
 	})
 
 	// Explicitly register PROPFIND method with proper handling
-	s.Handle("PROPFIND", "/*path", func(c *gin.Context) {
-		path := c.Param("path")
+	v1.Handle("PROPFIND", "/*path", func(c *gin.Context) {
+		path := strings.TrimPrefix(c.Param("path"), "/webdav")
 		fullPath := filepath.Join(s.config.RootDir, path)
 		s.handlePropfind(c, fullPath)
 	})
 
 	// Handle other WebDAV methods
-	s.Any("/*path", func(c *gin.Context) {
-		path := c.Param("path")
+	v1.Any("/*path", func(c *gin.Context) {
+		path := strings.TrimPrefix(c.Param("path"), "/webdav")
 		fullPath := filepath.Join(s.config.RootDir, path)
 
 		// Handle WebDAV methods
@@ -105,9 +106,10 @@ func (s *WebDAVServer) SetupRoutes() {
 
 // Start starts the WebDAV server
 func (s *WebDAVServer) Start() {
-	log.Printf("WebDAV server starting on port %s", s.config.Port)
+	addr := ":" + s.config.Port
+	log.Printf("WebDAV server starting on %s", addr)
 	log.Printf("WebDAV root directory: %s", s.config.RootDir)
-	if err := s.Run(":" + s.config.Port); err != nil {
+	if err := s.Run(addr); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }

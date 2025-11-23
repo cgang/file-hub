@@ -10,7 +10,7 @@ This project follows the [Go Standards Project Layout](https://github.com/golang
 ├── internal/             # Private application/business logic
 ├── pkg/                  # Library code
 ├── config/               # Configuration files
-├── web/                  # WebDAV interface and templates
+├── web/                  # Web frontend (Svelte UI and build assets)
 ├── scripts/              # Development/deployment scripts
 ├── test/                 # Test files
 └── docs/                 # Documentation

@@ -1,10 +1,16 @@
 package main
 
 import (
+	"io/fs"
+	"log"
+	"net/http"
+	"strings"
+
 	"github.com/cgang/file-hub/internal/config"
 	"github.com/cgang/file-hub/internal/stor"
 	"github.com/cgang/file-hub/internal/webdav"
-	"log"
+	"github.com/cgang/file-hub/web"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -17,8 +23,46 @@ func main() {
 
 	log.Println("Initializing WebDAV server...")
 	storage := &stor.OsStorage{}
-	server := webdav.NewFromConfig(cfg.WebDAV, storage, cfg.Storage.RootDir)
+	webdavServer := webdav.NewFromConfig(cfg.WebDAV, storage, cfg.Storage.RootDir)
 
-	log.Println("Starting WebDAV server...")
-	server.Start()
+	// Create a sub filesystem from the embedded files
+	subFS, err := fs.Sub(web.Assets, "dist")
+	if err != nil {
+		log.Fatalf("Failed to create sub filesystem: %v", err)
+	}
+
+	// Set up a file server for the embedded static assets
+	fileServer := http.FileServer(http.FS(subFS))
+
+	// Add a catch-all route to serve the frontend, while preserving API routes
+	webdavServer.Engine.NoRoute(func(c *gin.Context) {
+		// If it's an API call, don't serve frontend
+		if strings.HasPrefix(c.Request.URL.Path, "/api") ||
+		   strings.HasPrefix(c.Request.URL.Path, "/webdav") {
+			c.AbortWithStatusJSON(404, gin.H{"error": "API endpoint not found"})
+			return
+		}
+
+		// Otherwise, serve the frontend
+		filePath := strings.TrimPrefix(c.Request.URL.Path, "/")
+		if filePath == "" {
+			filePath = "index.html"
+		}
+
+		// Try to serve the requested file
+		file, err := subFS.Open(filePath)
+		if err != nil {
+			// If the file doesn't exist, serve index.html for the frontend router
+			c.Request.URL.Path = "/"
+			fileServer.ServeHTTP(c.Writer, c.Request)
+			return
+		}
+		defer file.Close()
+
+		// Serve the file
+		fileServer.ServeHTTP(c.Writer, c.Request)
+	})
+
+	log.Println("Starting WebDAV server with integrated UI...")
+	webdavServer.Start()
 }
