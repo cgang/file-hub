@@ -3,15 +3,15 @@ GOFILES=$(shell find . -type f -name "*.go")
 JSFILES=$(shell find web/src -type f -name "*.js" -o -name "*.svelte" -o -name "*.css")
 
 $(BINARY): $(GOFILES) $(JSFILES)
-	# Build frontend assets first
-	cd web && npm run build
+	# Install frontend dependencies and build assets first
+	cd web && npm install && npm run build
 	# Then build the Go binary with embedded assets
 	go build -o $(BINARY) cmd/main.go
 
 build: $(BINARY)
 
 run: build
-	./$(BINARY)
+	CONFIG_PATH=example ./$(BINARY)
 
 migrate:
 	psql -d filehub -f scripts/database_schema.sql
@@ -35,7 +35,9 @@ golint:
 clean:
 	rm -f $(BINARY)
 	rm -rf dist
-	rm -rf internal/assets
+	rm -rf web/dist
+	rm -rf node_modules
+	rm -rf web/node_modules
 
 all: build
 

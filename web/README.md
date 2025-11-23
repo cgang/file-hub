@@ -10,12 +10,7 @@ A minimal web-based interface to browse and manage files stored via WebDAV.
    npm install
    ```
 
-2. Create a `.env` file in the `web` directory with your WebDAV configuration:
-   ```env
-   VITE_WEBDAV_URL=http://localhost:8080
-   VITE_WEBDAV_USER=your_username
-   VITE_WEBDAV_PASS=your_password
-   ```
+2. The WebDAV URL is hardcoded to `/webdav` and authentication is handled server-side, so no additional configuration is needed in the frontend.
 
 3. Start the development server:
    ```bash

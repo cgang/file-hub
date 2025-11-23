@@ -7,7 +7,7 @@
   // Determine icon based on file type
   function getIcon() {
     if (file.type === 'directory') {
-      return '📁';
+      return '📁';  // Typical folder icon
     }
 
     // Determine icon based on file extension
@@ -31,7 +31,7 @@
         return '📊';
       case 'ppt':
       case 'pptx':
-        return '.slides';
+        return '📊';
       case 'zip':
       case 'rar':
       case '7z':
@@ -69,7 +69,12 @@
   // Handle click on file card
   function handleClick() {
     if (file.type === 'directory') {
-      dispatch('select', file.path);
+      // Always ensure directory path ends with '/'
+      let dirPath = file.path;
+      if (dirPath !== '/' && !dirPath.endsWith('/')) {
+        dirPath = dirPath + '/';
+      }
+      dispatch('select', dirPath);
     } else {
       // For files, we might open in a new tab or handle differently
       window.open(file.path, '_blank');
@@ -77,11 +82,11 @@
   }
 </script>
 
-<div class="file-card" on:click={handleClick}>
+<button type="button" class="file-card" on:click={handleClick} on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleClick()} aria-label="Select {file.type}: {file.name}">
   <div class="file-icon">{getIcon()}</div>
   <div class="file-name">{file.name}</div>
   {#if file.type !== 'directory'}
     <div class="file-meta">{formatSize(file.size)}</div>
     <div class="file-meta">{formatDate(file.lastModified)}</div>
   {/if}
-</div>
+</button>

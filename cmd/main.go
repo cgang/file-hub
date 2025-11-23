@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/cgang/file-hub/internal/config"
@@ -23,6 +24,15 @@ func main() {
 
 	log.Println("Initializing WebDAV server...")
 	storage := &stor.OsStorage{}
+
+	// Convert the storage root directory to an absolute path for logging
+	storageRootAbs, err := filepath.Abs(cfg.Storage.RootDir)
+	if err != nil {
+		log.Printf("Warning: Could not resolve absolute path for storage directory '%s': %v", cfg.Storage.RootDir, err)
+		storageRootAbs = cfg.Storage.RootDir  // Use original path if absolute path resolution fails
+	}
+	log.Printf("WebDAV root directory (absolute path): %s", storageRootAbs)
+
 	webdavServer := webdav.NewFromConfig(cfg.WebDAV, storage, cfg.Storage.RootDir)
 
 	// Create a sub filesystem from the embedded files
@@ -37,8 +47,8 @@ func main() {
 	// Add a catch-all route to serve the frontend, while preserving API routes
 	webdavServer.Engine.NoRoute(func(c *gin.Context) {
 		// If it's an API call, don't serve frontend
-		if strings.HasPrefix(c.Request.URL.Path, "/api") ||
-		   strings.HasPrefix(c.Request.URL.Path, "/webdav") {
+		// Note: WebDAV routes are handled by the router before reaching NoRoute
+		if strings.HasPrefix(c.Request.URL.Path, "/api") {
 			c.AbortWithStatusJSON(404, gin.H{"error": "API endpoint not found"})
 			return
 		}

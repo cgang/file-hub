@@ -15,7 +15,7 @@
           </li>
         {:else}
           <li class="breadcrumb-item">
-            <a href="#" class="breadcrumb-link" on:click|preventDefault={() => dispatch('navigate', breadcrumb.path)}>
+            <a href={`#${breadcrumb.path}`} class="breadcrumb-link" on:click|preventDefault={() => dispatch('navigate', breadcrumb.path)} on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && dispatch('navigate', breadcrumb.path)} aria-label="Go to {breadcrumb.name}">
               {breadcrumb.name}
             </a>
             <span class="breadcrumb-separator">/</span>

@@ -21,14 +21,19 @@
     loading = true;
     error = null;
 
+    // Ensure path is a string, default to root if not provided
+    if (typeof path !== 'string' || path === null || path === undefined) {
+      path = '/';
+    }
+
     try {
       files = await listDirectory(path);
       currentPath = path;
-      
+
       // Update breadcrumbs
       const pathParts = path.split('/').filter(part => part !== '');
       breadcrumbs = [{ name: 'Home', path: '/' }];
-      
+
       let currentPathSoFar = '';
       for (let i = 0; i < pathParts.length; i++) {
         currentPathSoFar += '/' + pathParts[i];
@@ -45,7 +50,8 @@
   }
 
   // Function to handle navigation to a directory
-  async function navigateToDirectory(path) {
+  async function navigateToDirectory(event) {
+    const path = event.detail;
     await loadDirectory(path);
   }
 
@@ -62,14 +68,20 @@
 
   // Function to navigate to parent directory
   async function goToParent() {
+    // Ensure currentPath is a string, default to root if not provided
+    if (typeof currentPath !== 'string' || currentPath === null || currentPath === undefined) {
+      await loadDirectory('/');
+      return;
+    }
+
     if (currentPath === '/') return;
-    
+
     const pathParts = currentPath.split('/').filter(part => part !== '');
     pathParts.pop(); // Remove current directory
-    
+
     let newPath = '/' + pathParts.join('/');
     if (newPath === '') newPath = '/';
-    
+
     await loadDirectory(newPath);
   }
 </script>
@@ -89,10 +101,10 @@
   {:else}
     <div class="file-grid">
       {#if currentPath !== '/'}
-        <div class="file-card" on:click={goToParent}>
+        <button type="button" class="file-card" on:click={goToParent} on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && goToParent()} aria-label="Go to parent directory">
           <div class="file-icon">📁</div>
-          <div class="file-name">.. (Parent)</div>
-        </div>
+          <div class="file-name">..</div>
+        </button>
       {/if}
 
       {#each files as file (file.path)}

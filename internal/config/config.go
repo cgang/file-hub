@@ -1,8 +1,12 @@
 package config
 
 import (
-	"gopkg.in/yaml.v3"
+	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // StorageConfig holds the storage configuration
@@ -21,19 +25,57 @@ type Config struct {
 	WebDAV  WebDAVConfig  `yaml:"webdav"`
 }
 
+// getConfigDirs returns a list of directories to search for config files
+// It includes directories from CONFIG_PATH environment variable (split by OS-specific separator)
+// and the current working directory
+func getConfigDirs() ([]string, error) {
+	var searchPaths []string
+
+	cp := os.Getenv("CONFIG_PATH")
+	if cp == "" {
+		return []string{""}, nil // empty string represents current directory
+	}
+
+	// Split CONFIG_PATH by the OS-specific list separator (colon on Unix, semicolon on Windows)
+	configPaths := filepath.SplitList(cp)
+	for _, configDir := range configPaths {
+		// Trim whitespace from directory path
+		configDir = strings.TrimSpace(configDir)
+		if configDir != "" {
+			searchPaths = append(searchPaths, configDir)
+		}
+	}
+
+	return searchPaths, nil
+}
+
 // LoadConfig loads configuration from a YAML file
 func LoadConfig(filename string) (*Config, error) {
-	data, err := os.ReadFile(filename)
+	// Get the list of directories to search for config files
+	searchPaths, err := getConfigDirs()
 	if err != nil {
 		return nil, err
 	}
+	// Search for config.yaml in each directory from getConfigDirs
+	for _, searchDir := range searchPaths {
+		configFile := filepath.Join(searchDir, "config.yaml")
+		if _, err := os.Stat(configFile); err == nil {
+			// Found a config file, try to load it
+			data, readErr := os.ReadFile(configFile)
+			if readErr != nil {
+				continue // Try next directory
+			}
 
-	var config Config
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, err
+			var config Config
+			if unmarshalErr := yaml.Unmarshal(data, &config); unmarshalErr != nil {
+				continue // Try next directory
+			}
+
+			return &config, nil
+		}
 	}
 
-	return &config, nil
+	return nil, fmt.Errorf("no config.yaml file found in CONFIG_PATH directories or current working directory")
 }
 
 // SaveConfig saves configuration to a YAML file

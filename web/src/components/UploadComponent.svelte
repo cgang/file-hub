@@ -8,7 +8,8 @@
   function handleFileInput(event) {
     const files = event.target.files;
     if (files.length > 0) {
-      dispatch('fileUpload', files[0]); // Only upload the first file for MVP
+      // Pass both the file and current path to the parent component
+      dispatch('fileUpload', { file: files[0], path: currentPath });
     }
   }
 

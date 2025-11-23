@@ -63,10 +63,12 @@ func (s *WebDAVServer) SetupRoutes() {
 	// Create a group for WebDAV routes to avoid conflicts with frontend
 	v1 := s.Group("/webdav")
 	v1.Use(func(c *gin.Context) {
+		// Add WebDAV headers
 		if c.Request.Method == "PROPFIND" {
 			c.Header("DAV", "1")
 			c.Header("Content-Type", "application/xml; charset=utf-8")
 		}
+
 		c.Next()
 	})
 
@@ -168,29 +170,74 @@ func (s *WebDAVServer) handlePropfind(c *gin.Context, fullPath string) {
 
 	// Build response
 	var ms Multistatus
-	ms.Response = make([]Response, 1)
-	ms.Response[0].Href = c.Request.URL.Path
-	ms.Response[0].Status = "HTTP/1.1 200 OK"
 
-	// Set properties
-	ms.Response[0].Prop.Name = filepath.Base(fullPath)
-	ms.Response[0].Prop.DisplayName = filepath.Base(fullPath)
-	ms.Response[0].Prop.IsCollection = "0"
-	ms.Response[0].Prop.ContentType = "application/octet-stream"
-	ms.Response[0].Prop.Length = "0"
-	ms.Response[0].Prop.LastModified = ""
-
-	if fileInfo != nil {
-		if fileInfo.IsDir() {
-			ms.Response[0].Prop.IsCollection = "1"
-			ms.Response[0].Prop.ContentType = "httpd/unix-directory"
+	// If it's a directory, list its contents
+	if fileInfo.IsDir() {
+		// Add the directory itself as the first response
+		dirResponse := Response{
+			Href:   c.Request.URL.Path,
+			Status: "HTTP/1.1 200 OK",
 		}
-		ms.Response[0].Prop.Length = fmt.Sprintf("%d", fileInfo.Size())
-		ms.Response[0].Prop.LastModified = fileInfo.ModTime().UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT")
+		dirResponse.Prop.Name = filepath.Base(fullPath)
+		dirResponse.Prop.DisplayName = filepath.Base(fullPath)
+		dirResponse.Prop.IsCollection = "1"
+		dirResponse.Prop.ContentType = "httpd/unix-directory"
+		dirResponse.Prop.Length = fmt.Sprintf("%d", fileInfo.Size())
+		dirResponse.Prop.LastModified = fileInfo.ModTime().UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT")
+		ms.Response = append(ms.Response, dirResponse)
+
+		// Read directory contents
+		entries, err := os.ReadDir(fullPath)
+		if err != nil {
+			log.Printf("Error reading directory %s: %v", fullPath, err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		// Add each entry to the response
+		for _, entry := range entries {
+			entryPath := filepath.Join(fullPath, entry.Name())
+			entryInfo, err := entry.Info()
+			if err != nil {
+				log.Printf("Error getting info for %s: %v", entryPath, err)
+				continue // Skip this entry
+			}
+
+			entryUrlPath := strings.TrimSuffix(c.Request.URL.Path, "/") + "/" + entry.Name()
+			entryResponse := Response{
+				Href:   entryUrlPath,
+				Status: "HTTP/1.1 200 OK",
+			}
+			entryResponse.Prop.Name = entry.Name()
+			entryResponse.Prop.DisplayName = entry.Name()
+			if entry.IsDir() {
+				entryResponse.Prop.IsCollection = "1"
+				entryResponse.Prop.ContentType = "httpd/unix-directory"
+			} else {
+				entryResponse.Prop.IsCollection = "0"
+				entryResponse.Prop.ContentType = "application/octet-stream"
+			}
+			entryResponse.Prop.Length = fmt.Sprintf("%d", entryInfo.Size())
+			entryResponse.Prop.LastModified = entryInfo.ModTime().UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT")
+			ms.Response = append(ms.Response, entryResponse)
+		}
+	} else {
+		// It's a file, respond with just this file's information
+		fileResponse := Response{
+			Href:   c.Request.URL.Path,
+			Status: "HTTP/1.1 200 OK",
+		}
+		fileResponse.Prop.Name = filepath.Base(fullPath)
+		fileResponse.Prop.DisplayName = filepath.Base(fullPath)
+		fileResponse.Prop.IsCollection = "0"
+		fileResponse.Prop.ContentType = "application/octet-stream"
+		fileResponse.Prop.Length = fmt.Sprintf("%d", fileInfo.Size())
+		fileResponse.Prop.LastModified = fileInfo.ModTime().UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT")
+		ms.Response = append(ms.Response, fileResponse)
 	}
 
 	// Log response
-	log.Printf("Sending PROPFIND response for %s", fullPath)
+	log.Printf("Sending PROPFIND response for %s with %d items", fullPath, len(ms.Response))
 
 	// Set XML content type and send response
 	c.XML(http.StatusOK, ms)

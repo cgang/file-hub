@@ -10,6 +10,6 @@ export default defineConfig({
     open: false  // Don't automatically open browser
   },
   build: {
-    outDir: '../dist'
+    outDir: 'dist'
   }
 });
