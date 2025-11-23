@@ -1,31 +1,20 @@
-// Package main implements the core application logic
 package main
 
 import (
-	"fmt"
+	"log"
+	"github.com/cgang/file-hub/internal/webdav"
 )
 
 func main() {
-	fmt.Println("Starting Go application...")
+	// Initialize WebDAV server with default configuration
+	config := webdav.Config{
+		RootDir: "./webdav_root",
+		Port:    "8080",
+	}
 
-	// Initialize application components
-	app := NewApplication()
+	log.Println("Initializing WebDAV server...")
+	server := webdav.New(config)
 
-	// Run the application
-	app.Run()
-}
-
-// Application represents the core application structure
-type Application struct {
-	// Add application-wide configuration and dependencies
-}
-
-// NewApplication creates a new application instance
-func NewApplication() *Application {
-	return &Application{}
-}
-
-// Run starts the application execution
-func (a *Application) Run() {
-	fmt.Println("Application is running")
+	log.Println("Starting WebDAV server...")
+	server.Start()
 }
