@@ -6,6 +6,9 @@ $(BINARY): $(GOFILES)
 
 build: $(BINARY)
 
+migrate:
+	psql -d filehub -f scripts/database_schema.sql
+
 golint:
 	golangci-lint run
 

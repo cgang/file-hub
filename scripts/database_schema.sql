@@ -28,10 +28,12 @@ CREATE TABLE files (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     is_deleted BOOLEAN DEFAULT FALSE,                -- For soft delete
-    deleted_at TIMESTAMP WITH TIME ZONE,             -- Timestamp when marked as deleted
-    INDEX idx_files_user_id (user_id),
-    INDEX idx_files_path (path)
+    deleted_at TIMESTAMP WITH TIME ZONE              -- Timestamp when marked as deleted
 );
+
+-- Create indexes for files table
+CREATE INDEX idx_files_user_id ON files (user_id);
+CREATE INDEX idx_files_path ON files (path);
 
 -- Quota management for users
 CREATE TABLE user_quota (
@@ -80,6 +82,10 @@ CREATE TRIGGER user_quota_trigger
 COMMENT ON TABLE users IS 'User accounts and authentication information';
 COMMENT ON TABLE files IS 'Metadata for files stored on the filesystem (directories implicit in path)';
 COMMENT ON TABLE user_quota IS 'Storage quota management for users';
+
+-- Index comments
+COMMENT ON INDEX idx_files_user_id IS 'Index on user_id column for faster file lookups by user';
+COMMENT ON INDEX idx_files_path IS 'Index on path column for faster file lookups by path';
 
 -- Relations documentation
 /*

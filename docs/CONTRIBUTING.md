@@ -30,6 +30,12 @@ This project follows the [Go Standards Project Layout](https://github.com/golang
 5. Create a pull request
 
 ## Technical Requirements
+### Database Setup
+- The database schema is located in `scripts/database_schema.sql`
+- To initialize the database:
+  1. Create database: `createdb filehub`
+  2. Apply schema: `psql -d filehub -f scripts/database_schema.sql`
+
 ### Testing
 - All new features must include unit tests
 - Run tests with `make test` before submitting PRs

@@ -42,7 +42,7 @@ cd file-hub
 
 # Setup database
 createdb filehub
-make migrate
+psql -d filehub -f scripts/database_schema.sql
 
 # Run service
 make run
