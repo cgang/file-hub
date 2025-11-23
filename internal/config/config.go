@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -14,15 +15,15 @@ type StorageConfig struct {
 	RootDir string `yaml:"root_dir"`
 }
 
-// WebDAVConfig holds the WebDAV server configuration
-type WebDAVConfig struct {
-	Port string `yaml:"port"`
+// WebConfig holds the WebDAV server configuration
+type WebConfig struct {
+	Port int `yaml:"port"`
 }
 
 // Config represents the main application configuration
 type Config struct {
 	Storage StorageConfig `yaml:"storage"`
-	WebDAV  WebDAVConfig  `yaml:"webdav"`
+	Web     WebConfig     `yaml:"web"`
 }
 
 // getConfigDirs returns a list of directories to search for config files
@@ -59,23 +60,30 @@ func LoadConfig(filename string) (*Config, error) {
 	// Search for config.yaml in each directory from getConfigDirs
 	for _, searchDir := range searchPaths {
 		configFile := filepath.Join(searchDir, "config.yaml")
-		if _, err := os.Stat(configFile); err == nil {
-			// Found a config file, try to load it
-			data, readErr := os.ReadFile(configFile)
-			if readErr != nil {
-				continue // Try next directory
-			}
-
-			var config Config
-			if unmarshalErr := yaml.Unmarshal(data, &config); unmarshalErr != nil {
-				continue // Try next directory
-			}
-
+		var config Config
+		if err = loadYamlFile(configFile, &config); err == nil {
+			config.Storage.RootDir = path.Join(searchDir, config.Storage.RootDir) // Make RootDir relative to config file location
 			return &config, nil
+		} else if os.IsNotExist(err) {
+			continue // Try next directory
+		} else {
+			return nil, fmt.Errorf("error reading config file '%s': %w", configFile, err)
 		}
 	}
 
-	return nil, fmt.Errorf("no config.yaml file found in CONFIG_PATH directories or current working directory")
+	return nil, fmt.Errorf("no config.yaml file found in CONFIG_PATH directories")
+}
+
+func loadYamlFile(filename string, out interface{}) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+
+	defer file.Close()
+
+	decoder := yaml.NewDecoder(file)
+	return decoder.Decode(out)
 }
 
 // SaveConfig saves configuration to a YAML file
@@ -92,10 +100,10 @@ func (c *Config) SaveConfig(filename string) error {
 func GetDefaultConfig() *Config {
 	return &Config{
 		Storage: StorageConfig{
-			RootDir: "./webdav_root",
+			RootDir: "root",
 		},
-		WebDAV: WebDAVConfig{
-			Port: "8080",
+		Web: WebConfig{
+			Port: 8080,
 		},
 	}
 }

@@ -1,4 +1,4 @@
 storage:
-  root_dir: "./example/root"
-webdav:
-  port: "8080"
+  root_dir: "root"
+web:
+  port: 8080
