@@ -8,23 +8,22 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/cgang/file-hub/internal/stor"
 	"github.com/gin-gonic/gin"
 )
 
-// WebDAVServer represents the WebDAV server
-type WebDAVServer struct {
+// WebDAV provides WebDAV server functionality
+type WebDAV struct {
 	storage stor.Storage
 }
 
 // New creates a new WebDAV server
-func New(storage stor.Storage) *WebDAVServer {
-	server := &WebDAVServer{
+func New(storage stor.Storage) *WebDAV {
+	return &WebDAV{
 		storage: storage,
 	}
-
-	return server
 }
 
 func setDavHeaders(c *gin.Context) {
@@ -32,18 +31,18 @@ func setDavHeaders(c *gin.Context) {
 	c.Header("Content-Type", "application/xml; charset=utf-8")
 }
 
-// SetupRoutes configures the WebDAV routes
-func (s *WebDAVServer) SetupRoutes(v1 *gin.RouterGroup) {
+// Register configures the WebDAV routes
+func (h *WebDAV) Register(v1 *gin.RouterGroup) {
 	v1.Use(setDavHeaders)
 
-	v1.PUT("/*path", s.handlePut)
-	v1.DELETE("/*path", s.handleDelete)
-	v1.GET("/*path", s.handleGet)
+	v1.PUT("/*path", h.handlePut)
+	v1.DELETE("/*path", h.handleDelete)
+	v1.GET("/*path", h.handleGet)
 
-	v1.Handle("PROPFIND", "/*path", s.handlePropfind)
-	v1.Handle("MKCOL", "/*path", s.handleMkcol)
-	v1.Handle("COPY", "/*path", s.handleCopyMove)
-	v1.Handle("MOVE", "/*path", s.handleCopyMove)
+	v1.Handle("PROPFIND", "/*path", h.handlePropfind)
+	v1.Handle("MKCOL", "/*path", h.handleMkcol)
+	v1.Handle("COPY", "/*path", h.handleCopyMove)
+	v1.Handle("MOVE", "/*path", h.handleCopyMove)
 }
 
 // XML structures for WebDAV
@@ -79,21 +78,21 @@ type ErrorBody struct {
 }
 
 // sendError sends a standardized WebDAV error response
-func sendError(c *gin.Context, status int, message string) {
+func sendError(c *gin.Context, status int, format string, a ...any) {
 	c.XML(status, &ErrorBody{
 		XMLName: xml.Name{Space: "DAV", Local: "error"},
-		Message: message,
+		Message: fmt.Sprintf(format, a...),
 	})
 }
 
 // handlePropfind handles PROPFIND requests
-func (s *WebDAVServer) handlePropfind(c *gin.Context) {
+func (h *WebDAV) handlePropfind(c *gin.Context) {
 	name := c.Param("path")
 	// Log request
 	log.Printf("Handling PROPFIND request for %s", name)
 
 	// Get file info using storage abstraction
-	file, err := s.storage.GetFileInfo(name)
+	file, err := h.storage.GetFileInfo(name)
 	if err != nil {
 		if os.IsNotExist(err) {
 			log.Printf("File not found: %s", name)
@@ -101,7 +100,7 @@ func (s *WebDAVServer) handlePropfind(c *gin.Context) {
 			return
 		}
 		log.Printf("Error accessing file %s: %v", name, err)
-		sendError(c, http.StatusInternalServerError, fmt.Sprintf("Error accessing file: %v", err))
+		sendError(c, http.StatusInternalServerError, "Error accessing file: %v", err)
 		return
 	}
 
@@ -113,10 +112,10 @@ func (s *WebDAVServer) handlePropfind(c *gin.Context) {
 
 	// If it's a directory, list its contents
 	if file.IsDir {
-		files, err := s.storage.ListDir(name)
+		files, err := h.storage.ListDir(name)
 		if err != nil {
 			log.Printf("Error reading directory %s: %v", name, err)
-			sendError(c, http.StatusInternalServerError, fmt.Sprintf("Failed to read directory: %v", err))
+			sendError(c, http.StatusInternalServerError, "Failed to read directory: %v", err)
 			return
 		}
 
@@ -142,7 +141,7 @@ func createResponse(href string, file *stor.File) Response {
 		IsCollection: "1",
 		ContentType:  "httpd/unix-directory",
 		Length:       fmt.Sprintf("%d", file.Size),
-		LastModified: file.LastModified.UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT"),
+		LastModified: file.LastModified.Format(time.RFC1123),
 	}
 
 	if !file.IsDir {
@@ -158,11 +157,11 @@ func createResponse(href string, file *stor.File) Response {
 }
 
 // handlePut handles PUT requests
-func (s *WebDAVServer) handlePut(c *gin.Context) {
+func (h *WebDAV) handlePut(c *gin.Context) {
 	name := c.Param("path")
 	// Write file using storage abstraction
-	if err := s.storage.WriteToFile(name, c.Request.Body); err != nil {
-		sendError(c, http.StatusInternalServerError, fmt.Sprintf("Failed to write file: %v", err))
+	if err := h.storage.WriteToFile(name, c.Request.Body); err != nil {
+		sendError(c, http.StatusInternalServerError, "Failed to write file: %v", err)
 		return
 	}
 
@@ -170,27 +169,27 @@ func (s *WebDAVServer) handlePut(c *gin.Context) {
 }
 
 // handleDelete handles DELETE requests
-func (s *WebDAVServer) handleDelete(c *gin.Context) {
+func (h *WebDAV) handleDelete(c *gin.Context) {
 	name := c.Param("path")
-	if err := s.storage.DeleteFile(name); err != nil {
-		sendError(c, http.StatusInternalServerError, fmt.Sprintf("Failed to delete file: %v", err))
+	if err := h.storage.DeleteFile(name); err != nil {
+		sendError(c, http.StatusInternalServerError, "Failed to delete file: %v", err)
 		return
 	}
 	c.Status(http.StatusNoContent)
 }
 
 // handleMkcol handles MKCOL requests
-func (s *WebDAVServer) handleMkcol(c *gin.Context) {
+func (h *WebDAV) handleMkcol(c *gin.Context) {
 	name := c.Param("path")
-	if err := s.storage.CreateDir(name); err != nil {
-		sendError(c, http.StatusInternalServerError, fmt.Sprintf("Failed to create directory: %v", err))
+	if err := h.storage.CreateDir(name); err != nil {
+		sendError(c, http.StatusInternalServerError, "Failed to create directory: %v", err)
 		return
 	}
 	c.Status(http.StatusCreated)
 }
 
 // handleCopyMove handles COPY and MOVE requests
-func (s *WebDAVServer) handleCopyMove(c *gin.Context) {
+func (h *WebDAV) handleCopyMove(c *gin.Context) {
 	srcPath := c.Param("path")
 	destination := c.Request.Header.Get("Destination")
 	if destination == "" {
@@ -202,22 +201,22 @@ func (s *WebDAVServer) handleCopyMove(c *gin.Context) {
 	destPath := strings.TrimPrefix(destination, "/")
 
 	// Create destination directory if needed
-	if err := s.storage.CreateDir(filepath.Dir(destPath)); err != nil {
-		sendError(c, http.StatusInternalServerError, fmt.Sprintf("Failed to create destination directory: %v", err))
+	if err := h.storage.CreateDir(filepath.Dir(destPath)); err != nil {
+		sendError(c, http.StatusInternalServerError, "Failed to create destination directory: %v", err)
 		return
 	}
 
 	// Handle COPY or MOVE
 	if c.Request.Method == "COPY" {
 		// Copy file/directory using storage
-		if err := s.storage.CopyFile(srcPath, destPath); err != nil {
-			sendError(c, http.StatusInternalServerError, fmt.Sprintf("Failed to copy file: %v", err))
+		if err := h.storage.CopyFile(srcPath, destPath); err != nil {
+			sendError(c, http.StatusInternalServerError, "Failed to copy file: %v", err)
 			return
 		}
 	} else {
 		// Move file/directory using storage
-		if err := s.storage.MoveFile(srcPath, destPath); err != nil {
-			sendError(c, http.StatusInternalServerError, fmt.Sprintf("Failed to move file: %v", err))
+		if err := h.storage.MoveFile(srcPath, destPath); err != nil {
+			sendError(c, http.StatusInternalServerError, "Failed to move file: %v", err)
 			return
 		}
 	}
@@ -226,12 +225,12 @@ func (s *WebDAVServer) handleCopyMove(c *gin.Context) {
 }
 
 // handleGet handles GET requests
-func (s *WebDAVServer) handleGet(c *gin.Context) {
+func (h *WebDAV) handleGet(c *gin.Context) {
 	name := c.Param("path")
 	// Check if file exists
-	exists, err := s.storage.Exists(name)
+	exists, err := h.storage.Exists(name)
 	if err != nil {
-		sendError(c, http.StatusInternalServerError, fmt.Sprintf("Error accessing file: %v", err))
+		sendError(c, http.StatusInternalServerError, "Error accessing file: %v", err)
 		return
 	}
 	if !exists {

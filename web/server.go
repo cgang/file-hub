@@ -26,7 +26,7 @@ func Start(cfg config.WebConfig, storage stor.Storage) {
 	}
 
 	engine := gin.Default()
-	webdavServer.SetupRoutes(engine.Group("/webdav"))
+	webdavServer.Register(engine.Group("/webdav"))
 
 	engine.NoRoute(func(c *gin.Context) {
 		http.FileServer(http.FS(assets)).ServeHTTP(c.Writer, c.Request)
