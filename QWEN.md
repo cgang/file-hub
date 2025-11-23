@@ -110,5 +110,5 @@ This project follows Go's community conduct standards, including:
 - Contributor Covenant
 
 ## 📚 Additional Resources
-- [CONTRIBUTING.md](CONTRIBUTING.md) - Detailed contribution guidelines
+- [CONTRIBUTING.md](docs/CONTRIBUTING.md) - Detailed contribution guidelines
 - [Go Proverbs](https://go-proverbs.github.io/) - Go community conventions to follow

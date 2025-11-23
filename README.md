@@ -47,4 +47,4 @@ make run
 ```
 
 ## 💡 Contributing
-Interested in contributing? See our [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Interested in contributing? See our [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
