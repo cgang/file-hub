@@ -141,7 +141,7 @@ func createResponse(href string, file *stor.File) Response {
 		IsCollection: "1",
 		ContentType:  "httpd/unix-directory",
 		Length:       fmt.Sprintf("%d", file.Size),
-		LastModified: file.LastModified.Format(time.RFC1123),
+		LastModified: file.LastModified.UTC().Format(time.RFC1123),
 	}
 
 	if !file.IsDir {
