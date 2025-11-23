@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cgang/file-hub/internal/config"
 	"github.com/cgang/file-hub/internal/stor"
 	"github.com/gin-gonic/gin"
 )
@@ -46,6 +47,15 @@ func New(config Config, storage stor.Storage) *WebDAVServer {
 	server.SetupRoutes()
 
 	return server
+}
+
+// NewFromConfig creates a new WebDAV server from the new configuration structure
+func NewFromConfig(webdavConfig config.WebDAVConfig, storage stor.Storage, storageRootDir string) *WebDAVServer {
+	config := Config{
+		RootDir: storageRootDir,
+		Port:    webdavConfig.Port,
+	}
+	return New(config, storage)
 }
 
 // SetupRoutes configures the WebDAV routes

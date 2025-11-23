@@ -77,9 +77,8 @@
 
 ## 🚀 Quick Start Commands
 ```bash
-# Setup database
-createdb filehub
-make migrate
+# Build binary
+make build
 
 # Run service
 make run
@@ -89,6 +88,21 @@ make run
 - `make test` - Run tests
 - `make migrate` - Run database migrations
 - `make run` - Start the service
+- `make build` - Build the application binary to bin/ directory
+- `make clean` - Remove built binaries
+
+## 🏗️ Build Instructions
+- Always use `make build` to build the application
+- Built binary will be created in `bin/` directory as `bin/file-hub`
+- Never create binary files in the root directory
+- Never commit binary files to the repository
+- Use `make clean` to remove built binaries
+
+## 📁 Directory Structure
+- Configuration files are stored in the `config/` directory
+- Application binary is built to the `bin/` directory
+- Source code is in `cmd/`, `internal/`, and `pkg/` directories
+- Documentation is in the `docs/` directory
 
 ## 🤝 Community Standards
 This project follows Go's community conduct standards, including:
