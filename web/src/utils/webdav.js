@@ -1,6 +1,6 @@
 // WebDAV utility functions for File Hub web UI
 
-let davBasePath = '/webdav';
+export let davBasePath = '/webdav';
 
 // Create authorization header
 function getAuthHeader() {

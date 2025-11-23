@@ -3,6 +3,7 @@ package webdav
 import (
 	"encoding/xml"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -138,15 +139,16 @@ func createResponse(href string, file *stor.File) Response {
 	prop := Prop{
 		Name:         file.Name,
 		DisplayName:  file.Name,
-		IsCollection: "1",
-		ContentType:  "httpd/unix-directory",
-		Length:       fmt.Sprintf("%d", file.Size),
 		LastModified: file.LastModified.UTC().Format(time.RFC1123),
 	}
 
-	if !file.IsDir {
+	if file.IsDir {
+		prop.IsCollection = "1"
+		prop.ContentType = "httpd/unix-directory"
+	} else {
 		prop.IsCollection = "0"
 		prop.ContentType = file.ContentType
+		prop.Length = fmt.Sprintf("%d", file.Size)
 	}
 
 	return Response{
@@ -227,16 +229,33 @@ func (h *WebDAV) handleCopyMove(c *gin.Context) {
 // handleGet handles GET requests
 func (h *WebDAV) handleGet(c *gin.Context) {
 	name := c.Param("path")
-	// Check if file exists
-	exists, err := h.storage.Exists(name)
+
+	info, err := h.storage.GetFileInfo(name)
 	if err != nil {
+		if os.IsNotExist(err) {
+			sendError(c, http.StatusNotFound, "File not found")
+			return
+		}
 		sendError(c, http.StatusInternalServerError, "Error accessing file: %v", err)
 		return
 	}
-	if !exists {
-		sendError(c, http.StatusNotFound, "File not found")
+
+	if info.IsDir {
+		sendError(c, http.StatusBadRequest, "Cannot GET a directory")
 		return
 	}
 
-	http.ServeFile(c.Writer, c.Request, name)
+	c.Header("Content-Type", info.ContentType)
+	c.Header("Content-Length", fmt.Sprintf("%d", info.Size))
+
+	file, err := h.storage.OpenFile(name)
+	if err != nil {
+		sendError(c, http.StatusInternalServerError, "Error opening file: %v", err)
+		return
+	}
+	defer file.Close()
+
+	if _, err := io.Copy(c.Writer, file); err != nil {
+		log.Printf("Failed to copy file content: %s", err)
+	}
 }

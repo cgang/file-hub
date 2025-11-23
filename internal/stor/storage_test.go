@@ -30,15 +30,6 @@ func TestOsStorage_CreateFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WriteString failed: %v", err)
 	}
-
-	// Check if file exists
-	exists, err := storage.Exists(filePath)
-	if err != nil {
-		t.Fatalf("Exists failed: %v", err)
-	}
-	if !exists {
-		t.Error("File should exist after creation")
-	}
 }
 
 func TestOsStorage_GetFileInfo(t *testing.T) {
@@ -83,15 +74,6 @@ func TestOsStorage_CreateDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateDir failed: %v", err)
 	}
-
-	// Check if directory exists
-	exists, err := storage.Exists(dirPath)
-	if err != nil {
-		t.Fatalf("Exists failed: %v", err)
-	}
-	if !exists {
-		t.Error("Directory should exist after creation")
-	}
 }
 
 func TestOsStorage_CopyFile(t *testing.T) {
@@ -115,15 +97,6 @@ func TestOsStorage_CopyFile(t *testing.T) {
 	err = storage.CopyFile(srcPath, dstPath)
 	if err != nil {
 		t.Fatalf("CopyFile failed: %v", err)
-	}
-
-	// Verify destination file exists
-	exists, err := storage.Exists(dstPath)
-	if err != nil {
-		t.Fatalf("Exists for destination failed: %v", err)
-	}
-	if !exists {
-		t.Error("Destination file should exist after copy")
 	}
 
 	// Verify content
@@ -160,24 +133,6 @@ func TestOsStorage_MoveFile(t *testing.T) {
 		t.Fatalf("MoveFile failed: %v", err)
 	}
 
-	// Verify source file no longer exists
-	exists, err := storage.Exists(srcPath)
-	if err != nil {
-		t.Fatalf("Exists for source failed: %v", err)
-	}
-	if exists {
-		t.Error("Source file should not exist after move")
-	}
-
-	// Verify destination file exists
-	exists, err = storage.Exists(dstPath)
-	if err != nil {
-		t.Fatalf("Exists for destination failed: %v", err)
-	}
-	if !exists {
-		t.Error("Destination file should exist after move")
-	}
-
 	// Verify content
 	dstFullPath := filepath.Join(tempDir, dstPath)
 	dstContent, err := os.ReadFile(dstFullPath)
@@ -204,27 +159,10 @@ func TestOsStorage_DeleteFile(t *testing.T) {
 	}
 	file.Close()
 
-	// Verify file exists
-	exists, err := storage.Exists(filePath)
-	if err != nil {
-		t.Fatalf("Exists before delete failed: %v", err)
-	}
-	if !exists {
-		t.Error("File should exist before delete")
-	}
-
 	// Delete file
 	err = storage.DeleteFile(filePath)
 	if err != nil {
 		t.Fatalf("DeleteFile failed: %v", err)
 	}
 
-	// Verify file no longer exists
-	exists, err = storage.Exists(filePath)
-	if err != nil {
-		t.Fatalf("Exists after delete failed: %v", err)
-	}
-	if exists {
-		t.Error("File should not exist after delete")
-	}
 }

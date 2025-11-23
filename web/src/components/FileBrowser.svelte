@@ -4,12 +4,15 @@
   import FileCard from './FileCard.svelte';
   import NavigationBar from './NavigationBar.svelte';
   import UploadComponent from './UploadComponent.svelte';
+import { getIcon, formatSize } from '../utils/fileUtils.js';
+import { davBasePath } from '../utils/webdav.js';
 
   let currentPath = '/';
   let files = [];
   let loading = false;
   let error = null;
   let breadcrumbs = [{ name: 'Home', path: '/' }];
+  let viewMode = 'table'; // 'table' or 'grid'
 
   // Load the initial directory
   onMount(async () => {
@@ -66,6 +69,11 @@
     }
   }
 
+// Function to toggle between table and grid views
+function toggleView() {
+  viewMode = viewMode === 'table' ? 'grid' : 'table';
+}
+
   // Function to navigate to parent directory
   async function goToParent() {
     // Ensure currentPath is a string, default to root if not provided
@@ -84,6 +92,17 @@
 
     await loadDirectory(newPath);
   }
+
+  // Handle file/directory click in table view
+  function handleFileClick(file) {
+    return () => {
+      if (file.type === 'directory') {
+        loadDirectory(file.path);
+      } else {
+        window.open(davBasePath + file.path, '_blank');
+      }
+    };
+  }
 </script>
 
 <div class="file-browser">
@@ -99,17 +118,52 @@
   {#if loading}
     <div class="loading">Loading files...</div>
   {:else}
-    <div class="file-grid">
-      {#if currentPath !== '/'}
-        <button type="button" class="file-card" on:click={goToParent} on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && goToParent()} aria-label="Go to parent directory">
-          <div class="file-icon">📁</div>
-          <div class="file-name">..</div>
-        </button>
-      {/if}
-
-      {#each files as file (file.path)}
-        <FileCard {file} on:select={navigateToDirectory} />
-      {/each}
+    <div class="view-toggle">
+      <button on:click={toggleView} aria-label="Toggle view mode">
+        {viewMode === 'table' ? '\grid' : '\list'}
+      </button>
     </div>
+    {#if viewMode === 'table'}
+      <table class="file-table">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Size</th>
+      <th>Last Modified</th>
+    </tr>
+  </thead>
+  <tbody>
+    {#if currentPath !== '/'}
+      <tr on:click={goToParent} on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && goToParent()} aria-label="Go to parent directory" tabindex="0">
+        <td>..</td>
+        <td></td>
+        <td></td>
+      </tr>
+    {/if}
+    {#each files as file}
+      <tr>
+        <td on:click={handleFileClick(file)} style="cursor: pointer;">
+  {getIcon(file)}
+  {file.name}
+</td>
+        <td>{formatSize(file.size)}</td>
+        <td>{file.lastModified}</td>
+      </tr>
+    {/each}
+  </tbody>
+      </table>
+    {:else}
+      <div class="file-grid">
+        {#if currentPath !== '/'}
+          <button type="button" class="file-card" on:click={goToParent} on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && goToParent()} aria-label="Go to parent directory">
+            <div class="file-icon">📁</div>
+            <div class="file-name">..</div>
+          </button>
+        {/if}
+        {#each files as file (file.path)}
+          <FileCard {file} on:select={navigateToDirectory} />
+        {/each}
+      </div>
+    {/if}
   {/if}
 </div>

@@ -26,8 +26,8 @@ type Storage interface {
 	CreateDir(path string) error
 	CopyFile(src, dst string) error
 	MoveFile(src, dst string) error
-	Exists(path string) (bool, error)
 	GetFileInfo(path string) (*File, error)
+	OpenFile(path string) (io.ReadCloser, error)
 	ListDir(path string) ([]*File, error)
 	WriteToFile(path string, content io.Reader) error
 }
@@ -78,18 +78,6 @@ func (s *OsStorage) MoveFile(src, dst string) error {
 	return os.Rename(srcFullPath, dstFullPath)
 }
 
-func (s *OsStorage) Exists(path string) (bool, error) {
-	fullPath := filepath.Join(s.rootDir, path)
-	_, err := os.Stat(fullPath)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
 func (s *OsStorage) GetFileInfo(path string) (*File, error) {
 	fullPath := filepath.Join(s.rootDir, path)
 	fileInfo, err := os.Stat(fullPath)
@@ -136,6 +124,11 @@ func (s *OsStorage) ListDir(path string) ([]*File, error) {
 	}
 
 	return files, nil
+}
+
+func (s *OsStorage) OpenFile(path string) (io.ReadCloser, error) {
+	fullPath := filepath.Join(s.rootDir, path)
+	return os.Open(fullPath)
 }
 
 func (s *OsStorage) WriteToFile(path string, content io.Reader) error {

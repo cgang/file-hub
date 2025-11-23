@@ -132,6 +132,68 @@ body {
   margin: 10px 0;
 }
 
+.file-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+}
+
+.file-table thead {
+  background-color: var(--background-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.file-table th {
+  text-align: left;
+  padding: 10px 15px;
+}
+
+.file-table tbody tr {
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.file-table tbody tr:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.file-table td {
+  padding: 10px 15px;
+  color: var(--text-color);
+}
+
+.file-table tr:hover {
+  background-color: var(--hover-color);
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.file-table .parent-directory td {
+  font-weight: bold;
+}
+
+.view-toggle {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.view-toggle button {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.view-toggle button:hover {
+  opacity: 0.9;
+}
+
 /* Responsive design */
 @media (min-width: 768px) {
   .file-grid {
