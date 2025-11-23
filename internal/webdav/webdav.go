@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cgang/file-hub/internal/stor"
 	"github.com/gin-gonic/gin"
 )
 
@@ -22,12 +23,12 @@ type Config struct {
 // WebDAVServer represents the WebDAV server
 type WebDAVServer struct {
 	*gin.Engine
-	config   Config
-	storage Storage
+	config  Config
+	storage stor.Storage
 }
 
 // New creates a new WebDAV server
-func New(config Config, storage Storage) *WebDAVServer {
+func New(config Config, storage stor.Storage) *WebDAVServer {
 	// Initialize WebDAV root directory
 	if err := storage.CreateDir(config.RootDir); err != nil {
 		panic(fmt.Sprintf("Failed to create WebDAV root directory: %v", err))

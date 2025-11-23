@@ -1,8 +1,9 @@
 package main
 
 import (
-	"log"
+	"github.com/cgang/file-hub/internal/stor"
 	"github.com/cgang/file-hub/internal/webdav"
+	"log"
 )
 
 func main() {
@@ -13,7 +14,8 @@ func main() {
 	}
 
 	log.Println("Initializing WebDAV server...")
-	server := webdav.New(config, &webdav.OsStorage{})
+	storage := &stor.OsStorage{}
+	server := webdav.New(config, storage)
 
 	log.Println("Starting WebDAV server...")
 	server.Start()

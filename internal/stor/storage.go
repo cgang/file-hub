@@ -1,8 +1,8 @@
-package webdav
+package stor
 
 import (
-	"os"
 	"io"
+	"os"
 )
 
 // Storage defines an interface for file operations
