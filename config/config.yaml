@@ -1,4 +1,0 @@
-storage:
-  root_dir: "./webdav_root"
-webdav:
-  port: "8080"

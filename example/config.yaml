@@ -1,0 +1,4 @@
+storage:
+  root_dir: "root"
+webdav:
+  port: "8080"
