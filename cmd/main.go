@@ -13,7 +13,7 @@ func main() {
 	}
 
 	log.Println("Initializing WebDAV server...")
-	server := webdav.New(config)
+	server := webdav.New(config, &webdav.OsStorage{})
 
 	log.Println("Starting WebDAV server...")
 	server.Start()

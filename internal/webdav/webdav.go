@@ -22,21 +22,23 @@ type Config struct {
 // WebDAVServer represents the WebDAV server
 type WebDAVServer struct {
 	*gin.Engine
-	config Config
+	config   Config
+	storage Storage
 }
 
 // New creates a new WebDAV server
-func New(config Config) *WebDAVServer {
+func New(config Config, storage Storage) *WebDAVServer {
 	// Initialize WebDAV root directory
-	if err := os.MkdirAll(config.RootDir, 0755); err != nil {
+	if err := storage.CreateDir(config.RootDir); err != nil {
 		panic(fmt.Sprintf("Failed to create WebDAV root directory: %v", err))
 	}
 
 	r := gin.Default()
 
 	server := &WebDAVServer{
-		Engine: r,
-		config: config,
+		Engine:  r,
+		config:  config,
+		storage: storage,
 	}
 
 	// Set up routes
@@ -55,19 +57,19 @@ func (s *WebDAVServer) SetupRoutes() {
 		}
 		c.Next()
 	})
-	
+
 	// Explicitly register PROPFIND method with proper handling
 	s.Handle("PROPFIND", "/*path", func(c *gin.Context) {
 		path := c.Param("path")
 		fullPath := filepath.Join(s.config.RootDir, path)
 		s.handlePropfind(c, fullPath)
 	})
-	
+
 	// Handle other WebDAV methods
 	s.Any("/*path", func(c *gin.Context) {
 		path := c.Param("path")
 		fullPath := filepath.Join(s.config.RootDir, path)
-		
+
 		// Handle WebDAV methods
 		switch c.Request.Method {
 		case "PROPFIND":
@@ -115,13 +117,13 @@ type Prop struct {
 }
 
 type Multistatus struct {
-	XMLName  xml.Name `xml:"multistatus"`
+	XMLName  xml.Name   `xml:"multistatus"`
 	Response []Response `xml:"response"`
 }
 
 type Response struct {
-	Href  string `xml:"href"`
-	Prop  Prop   `xml:"propstat>prop"`
+	Href   string `xml:"href"`
+	Prop   Prop   `xml:"propstat>prop"`
 	Status string `xml:"status"`
 }
 
