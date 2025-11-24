@@ -1,21 +1,28 @@
 // WebDAV utility functions for File Hub web UI
 
-export let davBasePath = '/webdav';
+// Base path for WebDAV requests
+const WEBDAV_BASE_PATH = '/webdav';
 
-// Create authorization header
-function getAuthHeader() {
-  // Return minimal headers without auth since authentication is handled server-side
+/**
+ * Create authorization header for WebDAV requests
+ * @returns {Object} Headers object with Content-Type
+ */
+function createRequestHeaders() {
   return {
     'Content-Type': 'application/octet-stream' // Default for file uploads
   };
 }
 
-// Function to list directory contents using PROPFIND
+/**
+ * List directory contents using PROPFIND
+ * @param {string} path - Path to list
+ * @returns {Promise<Array>} Array of file/directory objects
+ */
 export async function listDirectory(path) {
-  const response = await fetch(`${davBasePath}${path}`, {
+  const response = await fetch(`${WEBDAV_BASE_PATH}${path}`, {
     method: 'PROPFIND',
     headers: {
-      ...getAuthHeader(),
+      ...createRequestHeaders(),
       'Depth': '1'  // Only get immediate children
     }
   });
@@ -25,25 +32,25 @@ export async function listDirectory(path) {
   }
 
   const responseText = await response.text();
-  
+
   // Parse the XML response from WebDAV
   const parser = new DOMParser();
   const xmlDoc = parser.parseFromString(responseText, 'text/xml');
-  
+
   // Extract file and directory information
   const responses = xmlDoc.getElementsByTagName('response');
   const items = [];
-  
+
   for (let i = 0; i < responses.length; i++) {
     const response = responses[i];
     const href = response.getElementsByTagName('href')[0]?.textContent;
 
     if (!href) continue;
 
-    // Convert href to a relative path by removing the WebDAV_URL prefix
+    // Convert href to a relative path by removing the WebDAV URL prefix
     let relativeHref = decodeURIComponent(href);
-    if (relativeHref.startsWith(davBasePath)) {
-      relativeHref = relativeHref.substring(davBasePath.length);
+    if (relativeHref.startsWith(WEBDAV_BASE_PATH)) {
+      relativeHref = relativeHref.substring(WEBDAV_BASE_PATH.length);
       // Ensure path starts with / after removing prefix
       if (!relativeHref.startsWith('/')) {
         relativeHref = '/' + relativeHref;
@@ -95,69 +102,94 @@ export async function listDirectory(path) {
       contentType: contentType
     });
   }
-  
+
   return items;
 }
 
-// Function to upload a file
+/**
+ * Upload a file
+ * @param {string} path - Directory path to upload to
+ * @param {File} file - File object to upload
+ * @returns {Promise<Response>} Fetch response
+ */
 export async function uploadFile(path, file) {
   // Create the full file path
   const fullPath = path + file.name;
-  
-  const response = await fetch(`${davBasePath}${fullPath}`, {
+
+  const response = await fetch(`${WEBDAV_BASE_PATH}${fullPath}`, {
     method: 'PUT',
-    headers: getAuthHeader(),
+    headers: createRequestHeaders(),
     body: file
   });
 
   if (!response.ok) {
     throw new Error(`Failed to upload file: ${response.status} ${response.statusText}`);
   }
-  
+
   return response;
 }
 
-// Function to download a file
+/*
+ * The following functions are not currently used in the UI but are kept for future expansion
+ */
+
+/*
+ * Download a file
+ * @param {string} path - Path to the file
+ * @returns {Promise<Blob>} File blob
+ *
 export async function downloadFile(path) {
-  const response = await fetch(`${davBasePath}${path}`, {
+  const response = await fetch(`${WEBDAV_BASE_PATH}${path}`, {
     method: 'GET',
-    headers: getAuthHeader()
+    headers: createRequestHeaders()
   });
 
   if (!response.ok) {
     throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
   }
-  
+
   return response.blob();
 }
+*/
 
-// Function to delete a file or directory
+/*
+ * Delete a file or directory
+ * @param {string} path - Path to the file or directory
+ * @returns {Promise<Response>} Fetch response
+ *
 export async function deleteFile(path) {
-  const response = await fetch(`${davBasePath}${path}`, {
+  const response = await fetch(`${WEBDAV_BASE_PATH}${path}`, {
     method: 'DELETE',
-    headers: getAuthHeader()
+    headers: createRequestHeaders()
   });
 
   if (!response.ok) {
     throw new Error(`Failed to delete file: ${response.status} ${response.statusText}`);
   }
-  
+
   return response;
 }
+*/
 
-// Function to create a directory
+/*
+ * Create a directory
+ * @param {string} path - Parent directory path
+ * @param {string} dirName - Name of the directory to create
+ * @returns {Promise<Response>} Fetch response
+ *
 export async function createDirectory(path, dirName) {
   // Create the full directory path
   const fullPath = path + dirName;
-  
-  const response = await fetch(`${davBasePath}${fullPath}`, {
+
+  const response = await fetch(`${WEBDAV_BASE_PATH}${fullPath}`, {
     method: 'MKCOL',
-    headers: getAuthHeader()
+    headers: createRequestHeaders()
   });
 
   if (!response.ok) {
     throw new Error(`Failed to create directory: ${response.status} ${response.statusText}`);
   }
-  
+
   return response;
 }
+*/

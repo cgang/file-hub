@@ -1,30 +1,42 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
+  // Component properties
   export let currentPath;
 
+  // Svelte utilities
+  import { createEventDispatcher } from 'svelte';
   const dispatch = createEventDispatcher();
 
-  // Handle file input change
-  function handleFileInput(event) {
+  /**
+   * Handle file input change event
+   * @param {Event} event - Change event from file input
+   */
+  function handleFileInputChange(event) {
     const files = event.target.files;
     if (files.length > 0) {
-      // Pass both the file and current path to the parent component
+      // Dispatch both the file and current path to the parent component
       dispatch('fileUpload', { file: files[0], path: currentPath });
     }
   }
 
-  // Handle direct upload via input click
+  /**
+   * Trigger file input click programmatically
+   */
   function triggerFileInput() {
-    document.getElementById('fileInput').click();
+    document.getElementById('file-upload-input').click();
   }
 </script>
 
-<button class="upload-button" on:click={triggerFileInput}>
+<button
+  class="upload-button"
+  on:click={triggerFileInput}
+  aria-label="Upload a file"
+>
   Upload File
 </button>
+
 <input
-  id="fileInput"
+  id="file-upload-input"
   type="file"
-  style="display: none;"
-  on:change={handleFileInput}
+  class="file-input"
+  on:change={handleFileInputChange}
 />

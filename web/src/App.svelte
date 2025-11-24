@@ -3,6 +3,6 @@
 </script>
 
 <main>
-  <h1>File Hub</h1>
+  <h1>File Hub - Personal File Storage</h1>
   <FileBrowser />
 </main>
