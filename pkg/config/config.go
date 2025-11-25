@@ -20,10 +20,20 @@ type WebConfig struct {
 	Port int `yaml:"port"`
 }
 
+// DatabaseConfig holds the database configuration
+type DatabaseConfig struct {
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+	Database string `yaml:"database"`
+}
+
 // Config represents the main application configuration
 type Config struct {
-	Storage StorageConfig `yaml:"storage"`
-	Web     WebConfig     `yaml:"web"`
+	Storage  StorageConfig  `yaml:"storage"`
+	Web      WebConfig      `yaml:"web"`
+	Database DatabaseConfig `yaml:"database"`
 }
 
 // getConfigDirs returns a list of directories to search for config files
@@ -104,6 +114,13 @@ func GetDefaultConfig() *Config {
 		},
 		Web: WebConfig{
 			Port: 8080,
+		},
+		Database: DatabaseConfig{
+			Host:     "localhost",
+			Port:     5432,
+			User:     "filehub",
+			Password: "filehub",
+			Database: "filehub",
 		},
 	}
 }

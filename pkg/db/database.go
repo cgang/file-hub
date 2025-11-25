@@ -1,6 +1,9 @@
 package db
 
 import (
+	"fmt"
+
+	"github.com/cgang/file-hub/pkg/config"
 	"github.com/go-pg/pg/v10"
 	"github.com/go-pg/pg/v10/orm"
 )
@@ -11,7 +14,14 @@ type DB struct {
 }
 
 // New creates a new database connection
-func New(opts *pg.Options) (*DB, error) {
+func New(cfg config.DatabaseConfig) (*DB, error) {
+	opts := &pg.Options{
+		Addr:     fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		User:     cfg.User,
+		Password: cfg.Password,
+		Database: cfg.Database,
+	}
+
 	db := pg.Connect(opts)
 	return &DB{db}, nil
 }

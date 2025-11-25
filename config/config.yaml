@@ -1,0 +1,12 @@
+storage:
+  root_dir: "root"
+
+web:
+  port: 8080
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "filehub"
+  password: "filehub"
+  database: "filehub_dev"

@@ -7,12 +7,18 @@ import (
 
 	"github.com/cgang/file-hub/pkg/config"
 	"github.com/cgang/file-hub/pkg/stor"
+	"github.com/cgang/file-hub/pkg/users"
+	"github.com/cgang/file-hub/pkg/web/api"
+	"github.com/cgang/file-hub/pkg/web/internal/auth"
 	"github.com/cgang/file-hub/pkg/webdav"
 	"github.com/cgang/file-hub/web"
 	"github.com/gin-gonic/gin"
 )
 
-func Start(cfg config.WebConfig, storage stor.Storage) {
+func Start(cfg config.WebConfig, storage stor.Storage, userService *users.Service) {
+	// Set the user service for authentication
+	auth.SetUserService(userService)
+
 	webdavServer := webdav.New(storage)
 
 	// Create a sub filesystem from the embedded files
@@ -22,6 +28,8 @@ func Start(cfg config.WebConfig, storage stor.Storage) {
 	}
 
 	engine := gin.Default()
+
+	api.Register(engine.Group("/api"))
 	webdavServer.Register(engine.Group("/dav"))
 
 	engine.StaticFS("/ui", uiFiles)
