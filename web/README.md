@@ -10,7 +10,7 @@ A minimal web-based interface to browse and manage files stored via WebDAV.
    npm install
    ```
 
-2. The WebDAV URL is hardcoded to `/webdav` and authentication is handled server-side, so no additional configuration is needed in the frontend.
+2. The WebDAV URL is hardcoded to `/dav` and authentication is handled server-side, so no additional configuration is needed in the frontend.
 
 3. Start the development server:
    ```bash

@@ -38,7 +38,7 @@
       dispatch('select', dirPath);
     } else if (file.path) {
       // For files, open in a new tab
-      window.open('/webdav' + file.path, '_blank');
+      window.open('/dav' + file.path, '_blank');
     }
   }
 </script>

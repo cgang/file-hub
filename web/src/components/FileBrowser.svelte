@@ -134,7 +134,7 @@
                 if (file.type === 'directory') {
                   loadDirectory(file.path);
                 } else {
-                  window.open('/webdav' + file.path, '_blank');
+                  window.open('/dav' + file.path, '_blank');
                 }
               }} style="cursor: pointer;">
                 <!-- Icon and name displayed directly in table cell -->

@@ -131,7 +131,7 @@ Displays user information and storage quota usage. Could include quick navigatio
 - Build the integrated binary with `make build` (this automatically builds frontend assets and embeds them)
 - The single binary serves both the WebDAV API and the web interface
 - Access the UI at the root path (e.g., `http://localhost:8080`)
-- Access WebDAV API at `/webdav` path (e.g., `http://localhost:8080/webdav`)
+- Access WebDAV API at `/dav` path (e.g., `http://localhost:8080/dav`)
 
 ## Future Enhancements
 

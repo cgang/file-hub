@@ -36,7 +36,7 @@ A personal file backup and synchronization service with WebDAV support, PostgreS
 
 ## 🛠️ Configuration
 The service looks for a configuration file at `config/config.yaml` by default. You can override this by setting the `CONFIG_PATH` environment variable, which follows PATH convention (directories separated by colons). The service will search for `config.yaml` in each directory in order until it finds one. If no configuration file is found, it will use default values:
-- Storage directory: `./webdav_root`
+- Storage directory: `root`
 - Port: `8080`
 
 An example configuration is provided in `example/config.yaml`:
@@ -86,7 +86,7 @@ CONFIG_PATH=/path/to/config/directory ./bin/file-hub
 The project features a modern web UI built with Svelte that is embedded directly in the binary. The single binary serves both the WebDAV API and the web interface:
 
 - **Web UI**: Accessible at `http://localhost:8080` (or your configured host/port)
-- **WebDAV API**: Available at `http://localhost:8080/webdav`
+- **WebDAV API**: Available at `http://localhost:8080/dav`
 
 For development:
 ```bash

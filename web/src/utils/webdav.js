@@ -1,7 +1,7 @@
 // WebDAV utility functions for File Hub web UI
 
 // Base path for WebDAV requests
-const WEBDAV_BASE_PATH = '/webdav';
+const WEBDAV_BASE_PATH = '/dav';
 
 /**
  * Create authorization header for WebDAV requests

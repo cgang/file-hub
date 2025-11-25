@@ -26,10 +26,11 @@ func Start(cfg config.WebConfig, storage stor.Storage) {
 	}
 
 	engine := gin.Default()
-	webdavServer.Register(engine.Group("/webdav"))
+	webdavServer.Register(engine.Group("/dav"))
 
-	engine.NoRoute(func(c *gin.Context) {
-		http.FileServer(http.FS(assets)).ServeHTTP(c.Writer, c.Request)
+	engine.StaticFS("/ui", http.FS(assets))
+	engine.GET("/", func(c *gin.Context) {
+		c.Redirect(http.StatusFound, "/ui/")
 	})
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
