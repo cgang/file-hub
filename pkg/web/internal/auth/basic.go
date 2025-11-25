@@ -2,7 +2,11 @@ package auth
 
 import (
 	"encoding/base64"
+	"net/http"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/cgang/file-hub/pkg/users"
 )
 
 // parseBasicAuth parses the basic auth credentials from the encoded string
@@ -22,4 +26,34 @@ func parseBasicAuth(encoded string) (username, password string, ok bool) {
 
 	// Return the username and password
 	return cs[:s], cs[s+1:], true
+}
+
+// handleBasicAuth handles basic authentication
+func handleBasicAuth(c *gin.Context, creds string, userService *users.Service, realm string) {
+	username, password, ok := parseBasicAuth(creds)
+	if !ok {
+		c.Header("WWW-Authenticate", `Basic realm="`+realm+`"`)
+		c.String(http.StatusUnauthorized, "Invalid authorization format")
+		c.Abort()
+		return
+	}
+
+	if userService == nil {
+		c.String(http.StatusInternalServerError, "User service not initialized")
+		c.Abort()
+		return
+	}
+
+	// Authenticate the user using our user service
+	user, err := userService.Authenticate(username, password)
+	if err != nil {
+		c.Header("WWW-Authenticate", `Basic realm="`+realm+`"`)
+		c.String(http.StatusUnauthorized, "Invalid username or password")
+		c.Abort()
+		return
+	}
+
+	// Store the authenticated user in the context
+	c.Set("user", user)
+	c.Next()
 }

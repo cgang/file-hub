@@ -11,6 +11,12 @@ import (
 // UserService is the user service instance used for authentication
 var UserService *users.Service
 
+// NonceStore stores nonces for digest authentication
+var nonceStore = NewNonceStore()
+
+// Realm is the authentication realm
+const Realm = "FileHub"
+
 // SetUserService sets the user service instance for authentication
 func SetUserService(service *users.Service) {
 	UserService = service
@@ -19,7 +25,17 @@ func SetUserService(service *users.Service) {
 func Authenticate(c *gin.Context) {
 	authStr := c.GetHeader("Authorization")
 	if authStr == "" {
-		c.Header("WWW-Authenticate", `Basic realm="Restricted"`)
+		// Create a digest challenge
+		challenge, err := createDigestChallenge(Realm)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Failed to create auth challenge")
+			c.Abort()
+			return
+		}
+
+		// Also support basic auth
+		c.Header("WWW-Authenticate", `Basic realm="`+Realm+`"`)
+		c.Header("WWW-Authenticate", generateWWWAuthenticateHeader(challenge))
 		c.String(http.StatusUnauthorized, "No authorization provided")
 		c.Abort()
 		return
@@ -34,38 +50,14 @@ func Authenticate(c *gin.Context) {
 
 	switch kind {
 	case "Basic":
-		username, password, ok := parseBasicAuth(creds)
-		if !ok {
-			c.Header("WWW-Authenticate", `Basic realm="Restricted"`)
-			c.String(http.StatusUnauthorized, "Invalid authorization format")
-			c.Abort()
-			return
-		}
-
-		if UserService == nil {
-			c.String(http.StatusInternalServerError, "User service not initialized")
-			c.Abort()
-			return
-		}
-
-		// Authenticate the user using our user service
-		user, err := UserService.Authenticate(username, password)
-		if err != nil {
-			c.Header("WWW-Authenticate", `Basic realm="Restricted"`)
-			c.String(http.StatusUnauthorized, "Invalid username or password")
-			c.Abort()
-			return
-		}
-
-		// Store the authenticated user in the context
-		c.Set("user", user)
+		handleBasicAuth(c, creds, UserService, Realm)
+	case "Digest":
+		handleDigestAuth(c, authStr, UserService, nonceStore, Realm)
 	default:
 		c.String(http.StatusBadRequest, "Unsupported authorization method")
 		c.Abort()
 		return
 	}
-
-	c.Next()
 }
 
 // GetAuthenticatedUser retrieves the authenticated user from the context
