@@ -6,10 +6,9 @@ Before contributing, please read the [Go Proverbs](https://go-proverbs.github.io
 ## Project Structure
 This project follows the [Go Standards Project Layout](https://github.com/golang-standards/project-layout) with these key directories:
 ```
-├── cmd/                # Main application entry points
-├── internal/             # Private application/business logic
+├── cmd/                  # Main application entry points
+├── example/              # Example files
 ├── pkg/                  # Library code
-├── config/               # Configuration files
 ├── web/                  # Web frontend (Svelte UI and build assets)
 ├── scripts/              # Development/deployment scripts
 ├── test/                 # Test files

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cgang/file-hub/internal/stor"
+	"github.com/cgang/file-hub/pkg/stor"
 	"github.com/gin-gonic/gin"
 )
 

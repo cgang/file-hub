@@ -1,34 +1,30 @@
 package web
 
 import (
-	"embed"
 	"fmt"
-	"io/fs"
 	"log"
 	"net/http"
 
-	"github.com/cgang/file-hub/internal/config"
-	"github.com/cgang/file-hub/internal/stor"
-	"github.com/cgang/file-hub/internal/webdav"
+	"github.com/cgang/file-hub/pkg/config"
+	"github.com/cgang/file-hub/pkg/stor"
+	"github.com/cgang/file-hub/pkg/webdav"
+	"github.com/cgang/file-hub/web"
 	"github.com/gin-gonic/gin"
 )
-
-//go:embed dist/*
-var webFiles embed.FS
 
 func Start(cfg config.WebConfig, storage stor.Storage) {
 	webdavServer := webdav.New(storage)
 
 	// Create a sub filesystem from the embedded files
-	assets, err := fs.Sub(webFiles, "dist")
+	uiFiles, err := web.StaticFiles()
 	if err != nil {
-		log.Fatalf("Failed to create assets filesystem: %v", err)
+		log.Fatalf("Failed to load static files: %v", err)
 	}
 
 	engine := gin.Default()
 	webdavServer.Register(engine.Group("/dav"))
 
-	engine.StaticFS("/ui", http.FS(assets))
+	engine.StaticFS("/ui", uiFiles)
 	engine.GET("/", func(c *gin.Context) {
 		c.Redirect(http.StatusFound, "/ui/")
 	})

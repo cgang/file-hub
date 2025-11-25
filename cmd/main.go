@@ -3,9 +3,9 @@ package main
 import (
 	"log"
 
-	"github.com/cgang/file-hub/internal/config"
-	"github.com/cgang/file-hub/internal/stor"
-	"github.com/cgang/file-hub/web"
+	"github.com/cgang/file-hub/pkg/config"
+	"github.com/cgang/file-hub/pkg/stor"
+	"github.com/cgang/file-hub/pkg/web"
 )
 
 func main() {
