@@ -123,7 +123,7 @@ func TestParseDigestAuth(t *testing.T) {
 }
 
 func TestCalculateHA1(t *testing.T) {
-	ha1 := calculateHA1("testuser", "test", "password", "", "")
+	ha1 := calculateHA1("testuser", "test", "password")
 	// Calculate the expected value
 	expected := fmt.Sprintf("%x", md5.Sum([]byte("testuser:test:password")))
 

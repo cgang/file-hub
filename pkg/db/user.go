@@ -153,3 +153,19 @@ func (d *DB) DeleteUser(id int) error {
 
 	return nil
 }
+
+// UpdateUserHA1 updates a user's HA1 hash and realm
+func (d *DB) UpdateUserHA1(id int, ha1, realm string) error {
+	user := &User{ID: id, HA1: ha1, Realm: realm, UpdatedAt: time.Now()}
+	result, err := d.Model(user).Where("id = ?id").Update()
+
+	if err != nil {
+		return fmt.Errorf("failed to update user HA1: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("user not found")
+	}
+
+	return nil
+}

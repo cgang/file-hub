@@ -125,7 +125,7 @@ func parseDigestAuth(authStr string) (*DigestResponse, error) {
 }
 
 // calculateHA1 calculates the HA1 value for digest authentication
-func calculateHA1(username, realm, password, nonce, cnonce string) string {
+func calculateHA1(username, realm, password string) string {
 	// HA1 = MD5(username:realm:password)
 	ha1 := md5.Sum([]byte(fmt.Sprintf("%s:%s:%s", username, realm, password)))
 	return hex.EncodeToString(ha1[:])
@@ -185,8 +185,18 @@ func handleDigestAuth(c *gin.Context, authStr string, userService *users.Service
 		return
 	}
 
-	// Get the user
-	_, err = userService.GetByUsername(digest.Username)
+	// Validate the digest credentials using the user service
+	user, err := userService.ValidateDigest(
+		digest.Username,
+		digest.Realm,
+		digest.URI,
+		digest.Nonce,
+		digest.NC,
+		digest.CNonce,
+		digest.QoP,
+		digest.Response,
+		c.Request.Method,
+	)
 	if err != nil {
 		// Create a new challenge
 		challenge, err := createDigestChallenge(realm)
@@ -202,22 +212,9 @@ func handleDigestAuth(c *gin.Context, authStr string, userService *users.Service
 		return
 	}
 
-	// For digest auth, we need to validate using the stored HA1
-	// In a real implementation, you would store the HA1 value in the database
-	// For now, we'll simulate this by recreating the HA1 from the user's password
-	// NOTE: This is not secure for production! In production, you should store HA1 in the database
-
-	// Since we don't have the plaintext password anymore, we can't validate digest auth properly
-	// This is a limitation of our current implementation where we only store the hashed password
-
-	// For demonstration purposes, we'll reject digest auth requests
-	c.String(http.StatusUnauthorized, "Digest authentication not supported with current password storage")
-	c.Abort()
-	return
-
 	// Store the authenticated user in the context
-	// c.Set("user", user)
-	// c.Next()
+	c.Set("user", user)
+	c.Next()
 }
 
 // NonceStore stores nonces to prevent replay attacks

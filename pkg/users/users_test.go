@@ -11,47 +11,46 @@ import (
 // the business logic in our service rather than mocking the database.
 // In a real scenario, you'd want to use an in-memory database or proper mocks.
 
-func TestGenerateSalt(t *testing.T) {
-	salt1, err := generateSalt()
-	assert.NoError(t, err)
-	assert.NotEmpty(t, salt1)
+func TestCalculateHA1(t *testing.T) {
+	ha1 := calculateHA1("testuser", "test", "password")
+	assert.NotEmpty(t, ha1)
+	assert.Len(t, ha1, 32) // MD5 produces 32 character hex string
 
-	salt2, err := generateSalt()
-	assert.NoError(t, err)
-	assert.NotEmpty(t, salt2)
+	// Same inputs should produce same output
+	ha1Again := calculateHA1("testuser", "test", "password")
+	assert.Equal(t, ha1, ha1Again)
 
-	// Salts should be different
-	assert.NotEqual(t, salt1, salt2)
+	// Different inputs should produce different output
+	differentHA1 := calculateHA1("testuser", "test", "different")
+	assert.NotEqual(t, ha1, differentHA1)
 }
 
-func TestHashPassword(t *testing.T) {
-	password := "testpassword"
-	salt, err := generateSalt()
-	assert.NoError(t, err)
+func TestCalculateHA2(t *testing.T) {
+	ha2 := calculateHA2("GET", "/test")
+	assert.NotEmpty(t, ha2)
+	assert.Len(t, ha2, 32) // MD5 produces 32 character hex string
 
-	hash1, err := hashPassword(password, salt)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, hash1)
+	// Same inputs should produce same output
+	ha2Again := calculateHA2("GET", "/test")
+	assert.Equal(t, ha2, ha2Again)
 
-	hash2, err := hashPassword(password, salt)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, hash2)
+	// Different inputs should produce different output
+	differentHA2 := calculateHA2("POST", "/test")
+	assert.NotEqual(t, ha2, differentHA2)
+}
 
-	// Hashes should be the same for the same password and salt
-	assert.Equal(t, hash1, hash2)
+func TestCalculateResponse(t *testing.T) {
+	response := calculateResponse("ha1", "nonce", "nc", "cnonce", "qop", "ha2")
+	assert.NotEmpty(t, response)
+	assert.Len(t, response, 32) // MD5 produces 32 character hex string
 
-	// Hashes should be different for different passwords
-	differentSalt, err := generateSalt()
-	assert.NoError(t, err)
+	// Same inputs should produce same output
+	responseAgain := calculateResponse("ha1", "nonce", "nc", "cnonce", "qop", "ha2")
+	assert.Equal(t, response, responseAgain)
 
-	hash3, err := hashPassword("differentpassword", salt)
-	assert.NoError(t, err)
-	assert.NotEqual(t, hash1, hash3)
-
-	// Hashes should be different for different salts
-	hash4, err := hashPassword(password, differentSalt)
-	assert.NoError(t, err)
-	assert.NotEqual(t, hash1, hash4)
+	// Different inputs should produce different output
+	differentResponse := calculateResponse("ha1", "different", "nc", "cnonce", "qop", "ha2")
+	assert.NotEqual(t, response, differentResponse)
 }
 
 func TestUserCreationRequestValidation(t *testing.T) {

@@ -15,8 +15,8 @@ type User struct {
 	ID          int        `json:"id" pg:"id,pk"`
 	Username    string     `json:"username" pg:"username,unique"`
 	Email       string     `json:"email" pg:"email,unique"`
-	Password    string     `json:"-" pg:"password_hash"` // Don't expose password hash in JSON
-	Salt        string     `json:"-" pg:"salt"`          // Don't expose salt in JSON
+	HA1         string     `json:"-" pg:"ha1_hash"` // Don't expose HA1 hash in JSON
+	Realm       string     `json:"-" pg:"realm"`    // Don't expose realm in JSON
 	FirstName   *string    `json:"first_name,omitempty" pg:"first_name"`
 	LastName    *string    `json:"last_name,omitempty" pg:"last_name"`
 	CreatedAt   time.Time  `json:"created_at" pg:"created_at"`
