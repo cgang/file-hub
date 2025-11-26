@@ -8,9 +8,19 @@ import (
 )
 
 func Register(r *gin.RouterGroup) {
-	r.Use(auth.Authenticate)
+	// Public routes (no authentication required)
+	public := r.Group("/")
+	{
+		public.POST("/login", auth.LoginHandler)
+		public.POST("/logout", auth.LogoutHandler)
+	}
 
-	r.GET("/hello", Hello)
+	// Protected routes (authentication required)
+	protected := r.Group("/")
+	protected.Use(auth.Authenticate)
+	{
+		protected.GET("/hello", Hello)
+	}
 }
 
 func Hello(c *gin.Context) {

@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/cgang/file-hub/pkg/config"
+	"github.com/cgang/file-hub/pkg/session"
 	"github.com/cgang/file-hub/pkg/stor"
 	"github.com/cgang/file-hub/pkg/users"
 	"github.com/cgang/file-hub/pkg/web/api"
@@ -18,6 +19,10 @@ import (
 func Start(cfg config.WebConfig, storage stor.Storage, userService *users.Service) {
 	// Set the user service for authentication
 	auth.SetUserService(userService)
+
+	// Initialize session store
+	sessionStore := session.NewStore()
+	auth.SetSessionStore(sessionStore)
 
 	webdavServer := webdav.New(storage)
 
