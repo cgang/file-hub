@@ -3,6 +3,8 @@
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/cgang/file-hub)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
+[English](README.md) | [中文](README.zh.md)
+
 > ⚠️ **WORK IN PROGRESS** - This project is currently under active development and not yet ready for production use.
 
 A personal file backup and synchronization service with WebDAV support, PostgreSQL metadata storage, and efficient binary diff synchronization.
