@@ -1,114 +1,95 @@
 # Qwen AI Assistant Context - File Hub Project
 
-## Project Overview
-**Name:** File Hub - Personal File Sync Service
-**Description:** A personal file backup and synchronization service with WebDAV support, PostgreSQL metadata storage, and efficient binary diff synchronization.
-**Purpose:** Real-time file synchronization across devices with web interface for file management, designed for personal/family NAS systems.
+## AI-Specific Development Guidelines
 
-## 📌 Project Goals
-- Real-time file synchronization across devices
-- Web interface for file management
-- Cross-platform compatibility (Windows, macOS, Linux, Android, iOS)
-- Simple deployment for personal/family NAS systems
-- Client code maintained in a separate repository
+### Code Generation Principles
+- Generate idiomatic Go code following Effective Go conventions
+- Prioritize readability and maintainability over clever optimizations
+- Use clear, descriptive variable and function names
+- Follow the project's directory structure and organization patterns
+- Ensure all generated code includes appropriate error handling
 
-## 🔍 Core Features
-- **Storage Architecture:** Native filesystem storage with PostgreSQL metadata
-- **Sync Mechanism:** Binary diff algorithm for bandwidth optimization with conflict resolution
-- **Security:** End-to-end encryption for data in transit and at rest
-- **Performance:** Delta encoding transfers, caching, and parallel sync operations
+### Documentation Practices
+- Focus documentation on explaining "why" rather than "what"
+- Include inline comments for complex logic or non-obvious implementations
+- Update godoc comments for all public functions and types
+- Keep technical documentation concise but comprehensive
 
-## 🏗️ Project Structure
-```
-├── cmd/                # Main application entry points
-├── internal/             # Private application/business logic
-├── pkg/                  # Library code
-├── config/               # Configuration files
-├── web/                  # WebDAV interface and templates
-├── scripts/              # Development/deployment scripts
-├── test/                 # Test files
-└── docs/                 # Documentation
-```
+### Testing Approach
+- Always generate corresponding unit tests for new functionality
+- Follow table-driven test patterns for multiple test cases
+- Use testify/assert for clear assertion messages
+- Aim for >80% test coverage for new features
+- Include both positive and negative test cases
 
-## 🛠️ Development Guidelines
+### Error Handling Patterns
+- Wrap errors with context using fmt.Errorf("message: %w", err)
+- Return errors early to minimize nesting
+- Use multi-value returns consistently (value, error)
+- Log errors appropriately without exposing sensitive information
 
-### Code Style & Standards
-- Follow idiomatic Go conventions (gofmt, godoc)
-- Use Go modules for dependency management
-- Prefer clear, readable code over clever optimizations
-- Follow project-specific coding standards from CONTRIBUTING.md
-- Follow [Effective Go](https://golang.org/doc/effective_go) conventions
-
-### Contribution Process
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/my-feature`)
-3. Commit changes in imperative mood (e.g., "Fix bug" not "Fixed bug")
-4. Push to branch (`git push origin feature/my-feature`)
-5. Create a pull request
-
-### Technical Requirements
-- All new features must include unit tests
-- Run tests with `make test` before submitting PRs
-- Maintain 80%+ test coverage
-- Use Go modules for dependencies
-- Install golint for code quality checks (`make golint`)
-
-### Error Handling
-- Emphasize proper error wrapping and handling
-- Suggest appropriate logging with structured logging
-- Identify edge cases in network operations
-- Review deferred cleanup patterns
-
-### Testing & Quality
-- Focus on core functionality: file synchronization and storage
-- Use standard Go libraries where possible
-- Optimize for readability and maintainability
-- Prioritize Linux-specific optimizations and features
+## AI-Assisted Development Workflow
 
 ### Code Review Focus Areas
-- Proper error handling (multi-value returns, wrapping)
-- Goroutine leak risks and channel misuse
-- Concurrency patterns improvements
-- Proper file handling with os/io packages
-- API documentation with Godoc
-- Synchronization algorithms clearly explained
-- Performance considerations documented
-- Configuration documentation kept current
+When reviewing AI-generated code, pay special attention to:
+- Proper resource cleanup (defer statements for file handles, database connections)
+- Correct concurrency patterns (goroutines, channels, mutexes)
+- Security considerations (input validation, authentication, authorization)
+- Performance implications (memory usage, algorithmic complexity)
+- Integration with existing codebase components
 
-## 🚀 Quick Start Commands
-```bash
-# Build binary
-make build
+### Refactoring Guidance
+- Preserve existing APIs and interfaces when possible
+- Maintain backward compatibility during refactoring
+- Update dependent code when changing exported functions/types
+- Ensure database schema changes are properly migrated
 
-# Run service
-make run
-```
+### Best Practices for AI Collaboration
+1. Understand the existing codebase before suggesting changes
+2. Follow established patterns and conventions in the project
+3. Ask clarifying questions when requirements are ambiguous
+4. Provide multiple solution options when tradeoffs exist
+5. Explain complex technical decisions clearly
+6. Flag potential security or performance concerns
 
-## 🔧 Common Commands
-- `make test` - Run tests
-- `make migrate` - Run database migrations
-- `make run` - Start the service
-- `make build` - Build the application binary to bin/ directory
-- `make clean` - Remove built binaries
+## Project-Specific AI Knowledge Base
 
-## 🏗️ Build Instructions
-- Always use `make build` to build the application
-- Built binary will be created in `bin/` directory as `bin/file-hub`
-- Never create binary files in the root directory
-- Never commit binary files to the repository
-- Use `make clean` to remove built binaries
+### Architecture Overview
+- Backend: Go with embedded Svelte frontend
+- Database: PostgreSQL for metadata storage
+- Storage: Native filesystem with WebDAV interface
+- Sync: Binary diff algorithm for efficient transfers
 
-## 📁 Directory Structure
-- Configuration files are stored in the `config/` directory
-- Application binary is built to the `bin/` directory
-- Source code is in `cmd/`, `internal/`, and `pkg/` directories
-- Documentation is in the `docs/` directory
+### Key Components
+- WebDAV server implementation
+- File synchronization engine
+- PostgreSQL metadata management
+- Svelte web interface with Vite build system
 
-## 🤝 Community Standards
-This project follows Go's community conduct standards, including:
-- Go Code of Conduct
-- Contributor Covenant
+### Important Implementation Details
+- Frontend assets are embedded in the binary
+- Configuration uses YAML files with environment variable override
+- Authentication uses HTTP Basic Auth with database storage
+- Makefile orchestrates both frontend and backend builds
 
-## 📚 Additional Resources
-- [CONTRIBUTING.md](docs/CONTRIBUTING.md) - Detailed contribution guidelines
-- [Go Proverbs](https://go-proverbs.github.io/) - Go community conventions to follow
+## AI Context Reminders
+
+### Critical Success Factors
+- Maintain simplicity for personal/family NAS deployment
+- Ensure cross-platform compatibility
+- Preserve data integrity during sync operations
+- Keep dependencies minimal for easy installation
+
+### Common Pitfalls to Avoid
+- Over-engineering solutions beyond personal use case
+- Introducing heavy external dependencies
+- Compromising security for convenience
+- Ignoring error conditions in file operations
+
+### Optimization Priorities
+1. Bandwidth efficiency through delta encoding
+2. Storage efficiency with native filesystem
+3. Memory efficiency for large file operations
+4. CPU efficiency in sync algorithms
+
+This document serves as context for AI assistants working on the File Hub project, focusing on AI-specific collaboration guidelines while avoiding duplication of project documentation found in README.md, docs/CONTRIBUTING.md, and other documentation files.
