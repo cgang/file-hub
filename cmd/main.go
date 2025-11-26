@@ -18,7 +18,7 @@ func main() {
 	}
 
 	// Initialize database connection
-	database, err := db.New(cfg.Database)
+	database, err := db.New(cfg.Database.URI)
 	if err != nil {
 		log.Panicf("Failed to connect to database: %s", err)
 	}
@@ -33,7 +33,7 @@ func main() {
 	userService := users.NewService(database)
 
 	log.Println("Initializing WebDAV server...")
-	storage := stor.NewStorage(cfg.Storage.RootDir)
+	storage := stor.NewStorage(userService)
 
 	web.Start(cfg.Web, storage, userService)
 }

@@ -3,7 +3,6 @@ package db
 import (
 	"fmt"
 
-	"github.com/cgang/file-hub/pkg/config"
 	"github.com/go-pg/pg/v10"
 	"github.com/go-pg/pg/v10/orm"
 )
@@ -14,12 +13,11 @@ type DB struct {
 }
 
 // New creates a new database connection
-func New(cfg config.DatabaseConfig) (*DB, error) {
-	opts := &pg.Options{
-		Addr:     fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
-		User:     cfg.User,
-		Password: cfg.Password,
-		Database: cfg.Database,
+func New(connStr string) (*DB, error) {
+	// Parse connection string to extract options
+	opts, err := pg.ParseURL(connStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse connection string: %w", err)
 	}
 
 	db := pg.Connect(opts)

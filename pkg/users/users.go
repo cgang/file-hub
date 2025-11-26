@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/cgang/file-hub/pkg/db"
@@ -33,6 +34,7 @@ type User struct {
 	LastLogin   *time.Time `json:"last_login,omitempty"`
 	IsActive    bool       `json:"is_active"`
 	IsAdmin     bool       `json:"is_admin"`
+	HomeDir     string     `json:"home_dir"`
 }
 
 // CreateUserRequest contains the information needed to create a user
@@ -99,6 +101,7 @@ func (s *Service) Create(req *CreateUserRequest) (*User, error) {
 		UpdatedAt: dbUser.UpdatedAt,
 		IsActive:  dbUser.IsActive,
 		IsAdmin:   dbUser.IsAdmin,
+		HomeDir:   filepath.Join("/home", dbUser.Username),
 	}, nil
 }
 
@@ -120,6 +123,7 @@ func (s *Service) Get(id int) (*User, error) {
 		LastLogin: dbUser.LastLogin,
 		IsActive:  dbUser.IsActive,
 		IsAdmin:   dbUser.IsAdmin,
+		HomeDir:   filepath.Join("/home", dbUser.Username),
 	}, nil
 }
 
@@ -141,6 +145,7 @@ func (s *Service) GetByUsername(username string) (*User, error) {
 		LastLogin: dbUser.LastLogin,
 		IsActive:  dbUser.IsActive,
 		IsAdmin:   dbUser.IsAdmin,
+		HomeDir:   filepath.Join("/home", dbUser.Username),
 	}, nil
 }
 
@@ -201,6 +206,7 @@ func (s *Service) Authenticate(username, password string) (*User, error) {
 		LastLogin: &now,
 		IsActive:  dbUser.IsActive,
 		IsAdmin:   dbUser.IsAdmin,
+		HomeDir:   filepath.Join("/home", dbUser.Username),
 	}, nil
 }
 
@@ -251,6 +257,7 @@ func (s *Service) ValidateDigest(username, realm, uri, nonce, nc, cnonce, qop, r
 		LastLogin: &now,
 		IsActive:  dbUser.IsActive,
 		IsAdmin:   dbUser.IsAdmin,
+		HomeDir:   filepath.Join("/home", dbUser.Username),
 	}, nil
 }
 

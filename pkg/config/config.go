@@ -3,17 +3,11 @@ package config
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 )
-
-// StorageConfig holds the storage configuration
-type StorageConfig struct {
-	RootDir string `yaml:"root_dir"`
-}
 
 // WebConfig holds the WebDAV server configuration
 type WebConfig struct {
@@ -21,17 +15,13 @@ type WebConfig struct {
 }
 
 // DatabaseConfig holds the database configuration
+// It only supports URI format
 type DatabaseConfig struct {
-	Host     string `yaml:"host"`
-	Port     int    `yaml:"port"`
-	User     string `yaml:"user"`
-	Password string `yaml:"password"`
-	Database string `yaml:"database"`
+	URI string `yaml:"uri"`
 }
 
 // Config represents the main application configuration
 type Config struct {
-	Storage  StorageConfig  `yaml:"storage"`
 	Web      WebConfig      `yaml:"web"`
 	Database DatabaseConfig `yaml:"database"`
 }
@@ -72,7 +62,6 @@ func LoadConfig(filename string) (*Config, error) {
 		configFile := filepath.Join(searchDir, "config.yaml")
 		var config Config
 		if err = loadYamlFile(configFile, &config); err == nil {
-			config.Storage.RootDir = path.Join(searchDir, config.Storage.RootDir) // Make RootDir relative to config file location
 			return &config, nil
 		} else if os.IsNotExist(err) {
 			continue // Try next directory
@@ -109,18 +98,11 @@ func (c *Config) SaveConfig(filename string) error {
 // GetDefaultConfig returns a configuration with default values
 func GetDefaultConfig() *Config {
 	return &Config{
-		Storage: StorageConfig{
-			RootDir: "root",
-		},
 		Web: WebConfig{
 			Port: 8080,
 		},
 		Database: DatabaseConfig{
-			Host:     "localhost",
-			Port:     5432,
-			User:     "filehub",
-			Password: "filehub",
-			Database: "filehub",
+			URI: "postgresql://filehub:filehub@localhost:5432/filehub",
 		},
 	}
 }

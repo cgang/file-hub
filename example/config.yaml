@@ -1,4 +1,5 @@
-storage:
-  root_dir: "root"
 web:
   port: 8080
+
+database:
+  uri: "postgresql://filehub:filehub@localhost:5432/filehub"

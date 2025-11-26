@@ -35,7 +35,11 @@ func Start(cfg config.WebConfig, storage stor.Storage, userService *users.Servic
 	engine := gin.Default()
 
 	api.Register(engine.Group("/api"))
-	webdavServer.Register(engine.Group("/dav"))
+
+	// Register WebDAV with authentication middleware
+	webdavGroup := engine.Group("/dav")
+	webdavGroup.Use(auth.Authenticate)
+	webdavServer.Register(webdavGroup)
 
 	engine.StaticFS("/ui", uiFiles)
 	engine.GET("/", func(c *gin.Context) {

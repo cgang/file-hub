@@ -1,11 +1,14 @@
 package stor
 
 import (
+	"context"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/cgang/file-hub/pkg/users"
 )
 
 // File represents a file or directory in the storage system
@@ -21,45 +24,63 @@ type File struct {
 // Storage defines an interface for file operations
 type Storage interface {
 	// File operations
-	CreateFile(path string) (*os.File, error)
-	DeleteFile(path string) error
-	CreateDir(path string) error
-	CopyFile(src, dst string) error
-	MoveFile(src, dst string) error
-	GetFileInfo(path string) (*File, error)
-	OpenFile(path string) (io.ReadCloser, error)
-	ListDir(path string) ([]*File, error)
-	WriteToFile(path string, content io.Reader) error
+	CreateFile(ctx context.Context, user *users.User, path string) (*os.File, error)
+	DeleteFile(ctx context.Context, user *users.User, path string) error
+	CreateDir(ctx context.Context, user *users.User, path string) error
+	CopyFile(ctx context.Context, user *users.User, src, dst string) error
+	MoveFile(ctx context.Context, user *users.User, src, dst string) error
+	GetFileInfo(ctx context.Context, user *users.User, path string) (*File, error)
+	OpenFile(ctx context.Context, user *users.User, path string) (io.ReadCloser, error)
+	ListDir(ctx context.Context, user *users.User, path string) ([]*File, error)
+	WriteToFile(ctx context.Context, user *users.User, path string, content io.Reader) error
 }
 
-func NewStorage(rootDir string) Storage {
-	return &OsStorage{rootDir: rootDir}
+func NewStorage(users *users.Service) Storage {
+	return &OsStorage{users: users}
 }
 
 // OsStorage implements Storage using standard OS operations
 type OsStorage struct {
-	rootDir string
+	users *users.Service
 }
 
-func (s *OsStorage) CreateFile(path string) (*os.File, error) {
-	fullPath := filepath.Join(s.rootDir, path)
+// getFullPath combines the user's home directory with the relative path
+func (s *OsStorage) getFullPath(user *users.User, path string) string {
+	// Clean the path to prevent directory traversal attacks
+	cleanPath := filepath.Clean(path)
+	
+	// Join with user's home directory
+	fullPath := filepath.Join(user.HomeDir, cleanPath)
+	
+	// Ensure the path is still within the user's home directory
+	// This prevents directory traversal attacks
+	if !strings.HasPrefix(fullPath, user.HomeDir+string(filepath.Separator)) && fullPath != user.HomeDir {
+		// If the path is outside the user's home directory, default to the home directory
+		return user.HomeDir
+	}
+	
+	return fullPath
+}
+
+func (s *OsStorage) CreateFile(ctx context.Context, user *users.User, path string) (*os.File, error) {
+	fullPath := s.getFullPath(user, path)
 	return os.Create(fullPath)
 }
 
-func (s *OsStorage) DeleteFile(path string) error {
-	fullPath := filepath.Join(s.rootDir, path)
+func (s *OsStorage) DeleteFile(ctx context.Context, user *users.User, path string) error {
+	fullPath := s.getFullPath(user, path)
 	return os.RemoveAll(fullPath)
 }
 
-func (s *OsStorage) CreateDir(path string) error {
-	fullPath := filepath.Join(s.rootDir, path)
+func (s *OsStorage) CreateDir(ctx context.Context, user *users.User, path string) error {
+	fullPath := s.getFullPath(user, path)
 	return os.MkdirAll(fullPath, 0755)
 }
 
-func (s *OsStorage) CopyFile(src, dst string) error {
+func (s *OsStorage) CopyFile(ctx context.Context, user *users.User, src, dst string) error {
 	// Handle directory or file copy
-	srcFullPath := filepath.Join(s.rootDir, src)
-	dstFullPath := filepath.Join(s.rootDir, dst)
+	srcFullPath := s.getFullPath(user, src)
+	dstFullPath := s.getFullPath(user, dst)
 
 	srcInfo, err := os.Stat(srcFullPath)
 	if err != nil {
@@ -67,19 +88,19 @@ func (s *OsStorage) CopyFile(src, dst string) error {
 	}
 
 	if srcInfo.IsDir() {
-		return copyDir(srcFullPath, dstFullPath)
+		return copyDir(ctx, srcFullPath, dstFullPath)
 	}
-	return copyFile(srcFullPath, dstFullPath)
+	return copyFile(ctx, srcFullPath, dstFullPath)
 }
 
-func (s *OsStorage) MoveFile(src, dst string) error {
-	srcFullPath := filepath.Join(s.rootDir, src)
-	dstFullPath := filepath.Join(s.rootDir, dst)
+func (s *OsStorage) MoveFile(ctx context.Context, user *users.User, src, dst string) error {
+	srcFullPath := s.getFullPath(user, src)
+	dstFullPath := s.getFullPath(user, dst)
 	return os.Rename(srcFullPath, dstFullPath)
 }
 
-func (s *OsStorage) GetFileInfo(path string) (*File, error) {
-	fullPath := filepath.Join(s.rootDir, path)
+func (s *OsStorage) GetFileInfo(ctx context.Context, user *users.User, path string) (*File, error) {
+	fullPath := s.getFullPath(user, path)
 	fileInfo, err := os.Stat(fullPath)
 	if err != nil {
 		return nil, err
@@ -106,8 +127,8 @@ func (s *OsStorage) GetFileInfo(path string) (*File, error) {
 	return file, nil
 }
 
-func (s *OsStorage) ListDir(path string) ([]*File, error) {
-	fullPath := filepath.Join(s.rootDir, path)
+func (s *OsStorage) ListDir(ctx context.Context, user *users.User, path string) ([]*File, error) {
+	fullPath := s.getFullPath(user, path)
 	entries, err := os.ReadDir(fullPath)
 	if err != nil {
 		return nil, err
@@ -116,7 +137,7 @@ func (s *OsStorage) ListDir(path string) ([]*File, error) {
 	files := make([]*File, 0, len(entries))
 	for _, entry := range entries {
 		entryPath := filepath.Join(path, entry.Name())
-		file, err := s.GetFileInfo(entryPath)
+		file, err := s.GetFileInfo(ctx, user, entryPath)
 		if err != nil {
 			continue
 		}
@@ -126,16 +147,16 @@ func (s *OsStorage) ListDir(path string) ([]*File, error) {
 	return files, nil
 }
 
-func (s *OsStorage) OpenFile(path string) (io.ReadCloser, error) {
-	fullPath := filepath.Join(s.rootDir, path)
+func (s *OsStorage) OpenFile(ctx context.Context, user *users.User, path string) (io.ReadCloser, error) {
+	fullPath := s.getFullPath(user, path)
 	return os.Open(fullPath)
 }
 
-func (s *OsStorage) WriteToFile(path string, content io.Reader) error {
+func (s *OsStorage) WriteToFile(ctx context.Context, user *users.User, path string, content io.Reader) error {
 	// Create directory if needed
-	fullPath := filepath.Join(s.rootDir, path)
+	fullPath := s.getFullPath(user, path)
 	dirPath := filepath.Dir(fullPath)
-	if err := s.CreateDir(dirPath); err != nil {
+	if err := s.CreateDir(ctx, user, dirPath); err != nil {
 		return err
 	}
 
@@ -152,7 +173,7 @@ func (s *OsStorage) WriteToFile(path string, content io.Reader) error {
 }
 
 // Helper functions
-func copyFile(src, dst string) error {
+func copyFile(ctx context.Context, src, dst string) error {
 	// Create destination directory if needed
 	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
 		return err
@@ -174,7 +195,7 @@ func copyFile(src, dst string) error {
 	return err
 }
 
-func copyDir(src, dst string) error {
+func copyDir(ctx context.Context, src, dst string) error {
 	// Create destination directory
 	if err := os.MkdirAll(dst, 0755); err != nil {
 		return err
@@ -192,11 +213,11 @@ func copyDir(src, dst string) error {
 		dstPath := filepath.Join(dst, file.Name())
 
 		if file.IsDir() {
-			if err := copyDir(srcPath, dstPath); err != nil {
+			if err := copyDir(ctx, srcPath, dstPath); err != nil {
 				return err
 			}
 		} else {
-			if err := copyFile(srcPath, dstPath); err != nil {
+			if err := copyFile(ctx, srcPath, dstPath); err != nil {
 				return err
 			}
 		}

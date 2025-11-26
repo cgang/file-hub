@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cgang/file-hub/pkg/stor"
+	"github.com/cgang/file-hub/pkg/users"
 	"github.com/gin-gonic/gin"
 )
 
@@ -32,8 +33,24 @@ func setDavHeaders(c *gin.Context) {
 	c.Header("Content-Type", "application/xml; charset=utf-8")
 }
 
+// getAuthenticatedUser retrieves the authenticated user from the context
+func getAuthenticatedUser(c *gin.Context) (*users.User, error) {
+	userValue, exists := c.Get("user")
+	if !exists {
+		return nil, fmt.Errorf("no authenticated user found")
+	}
+
+	user, ok := userValue.(*users.User)
+	if !ok {
+		return nil, fmt.Errorf("invalid user type in context")
+	}
+
+	return user, nil
+}
+
 // Register configures the WebDAV routes
 func (h *WebDAV) Register(v1 *gin.RouterGroup) {
+	// Note: Authentication should be handled by a middleware in the calling code
 	v1.Use(setDavHeaders)
 
 	v1.PUT("/*path", h.handlePut)
@@ -88,12 +105,19 @@ func sendError(c *gin.Context, status int, format string, a ...any) {
 
 // handlePropfind handles PROPFIND requests
 func (h *WebDAV) handlePropfind(c *gin.Context) {
+	// Get authenticated user
+	user, err := getAuthenticatedUser(c)
+	if err != nil {
+		sendError(c, http.StatusUnauthorized, "Authentication required")
+		return
+	}
+
 	name := c.Param("path")
 	// Log request
 	log.Printf("Handling PROPFIND request for %s", name)
 
 	// Get file info using storage abstraction
-	file, err := h.storage.GetFileInfo(name)
+	file, err := h.storage.GetFileInfo(c, user, name)
 	if err != nil {
 		if os.IsNotExist(err) {
 			log.Printf("File not found: %s", name)
@@ -113,7 +137,7 @@ func (h *WebDAV) handlePropfind(c *gin.Context) {
 
 	// If it's a directory, list its contents
 	if file.IsDir {
-		files, err := h.storage.ListDir(name)
+		files, err := h.storage.ListDir(c, user, name)
 		if err != nil {
 			log.Printf("Error reading directory %s: %v", name, err)
 			sendError(c, http.StatusInternalServerError, "Failed to read directory: %v", err)
@@ -160,9 +184,16 @@ func createResponse(href string, file *stor.File) Response {
 
 // handlePut handles PUT requests
 func (h *WebDAV) handlePut(c *gin.Context) {
+	// Get authenticated user
+	user, err := getAuthenticatedUser(c)
+	if err != nil {
+		sendError(c, http.StatusUnauthorized, "Authentication required")
+		return
+	}
+
 	name := c.Param("path")
 	// Write file using storage abstraction
-	if err := h.storage.WriteToFile(name, c.Request.Body); err != nil {
+	if err := h.storage.WriteToFile(c, user, name, c.Request.Body); err != nil {
 		sendError(c, http.StatusInternalServerError, "Failed to write file: %v", err)
 		return
 	}
@@ -172,8 +203,15 @@ func (h *WebDAV) handlePut(c *gin.Context) {
 
 // handleDelete handles DELETE requests
 func (h *WebDAV) handleDelete(c *gin.Context) {
+	// Get authenticated user
+	user, err := getAuthenticatedUser(c)
+	if err != nil {
+		sendError(c, http.StatusUnauthorized, "Authentication required")
+		return
+	}
+
 	name := c.Param("path")
-	if err := h.storage.DeleteFile(name); err != nil {
+	if err := h.storage.DeleteFile(c, user, name); err != nil {
 		sendError(c, http.StatusInternalServerError, "Failed to delete file: %v", err)
 		return
 	}
@@ -182,8 +220,15 @@ func (h *WebDAV) handleDelete(c *gin.Context) {
 
 // handleMkcol handles MKCOL requests
 func (h *WebDAV) handleMkcol(c *gin.Context) {
+	// Get authenticated user
+	user, err := getAuthenticatedUser(c)
+	if err != nil {
+		sendError(c, http.StatusUnauthorized, "Authentication required")
+		return
+	}
+
 	name := c.Param("path")
-	if err := h.storage.CreateDir(name); err != nil {
+	if err := h.storage.CreateDir(c, user, name); err != nil {
 		sendError(c, http.StatusInternalServerError, "Failed to create directory: %v", err)
 		return
 	}
@@ -192,6 +237,13 @@ func (h *WebDAV) handleMkcol(c *gin.Context) {
 
 // handleCopyMove handles COPY and MOVE requests
 func (h *WebDAV) handleCopyMove(c *gin.Context) {
+	// Get authenticated user
+	user, err := getAuthenticatedUser(c)
+	if err != nil {
+		sendError(c, http.StatusUnauthorized, "Authentication required")
+		return
+	}
+
 	srcPath := c.Param("path")
 	destination := c.Request.Header.Get("Destination")
 	if destination == "" {
@@ -203,7 +255,7 @@ func (h *WebDAV) handleCopyMove(c *gin.Context) {
 	destPath := strings.TrimPrefix(destination, "/")
 
 	// Create destination directory if needed
-	if err := h.storage.CreateDir(filepath.Dir(destPath)); err != nil {
+	if err := h.storage.CreateDir(c, user, filepath.Dir(destPath)); err != nil {
 		sendError(c, http.StatusInternalServerError, "Failed to create destination directory: %v", err)
 		return
 	}
@@ -211,13 +263,13 @@ func (h *WebDAV) handleCopyMove(c *gin.Context) {
 	// Handle COPY or MOVE
 	if c.Request.Method == "COPY" {
 		// Copy file/directory using storage
-		if err := h.storage.CopyFile(srcPath, destPath); err != nil {
+		if err := h.storage.CopyFile(c, user, srcPath, destPath); err != nil {
 			sendError(c, http.StatusInternalServerError, "Failed to copy file: %v", err)
 			return
 		}
 	} else {
 		// Move file/directory using storage
-		if err := h.storage.MoveFile(srcPath, destPath); err != nil {
+		if err := h.storage.MoveFile(c, user, srcPath, destPath); err != nil {
 			sendError(c, http.StatusInternalServerError, "Failed to move file: %v", err)
 			return
 		}
@@ -228,9 +280,16 @@ func (h *WebDAV) handleCopyMove(c *gin.Context) {
 
 // handleGet handles GET requests
 func (h *WebDAV) handleGet(c *gin.Context) {
+	// Get authenticated user
+	user, err := getAuthenticatedUser(c)
+	if err != nil {
+		sendError(c, http.StatusUnauthorized, "Authentication required")
+		return
+	}
+
 	name := c.Param("path")
 
-	info, err := h.storage.GetFileInfo(name)
+	info, err := h.storage.GetFileInfo(c, user, name)
 	if err != nil {
 		if os.IsNotExist(err) {
 			sendError(c, http.StatusNotFound, "File not found")
@@ -248,7 +307,7 @@ func (h *WebDAV) handleGet(c *gin.Context) {
 	c.Header("Content-Type", info.ContentType)
 	c.Header("Content-Length", fmt.Sprintf("%d", info.Size))
 
-	file, err := h.storage.OpenFile(name)
+	file, err := h.storage.OpenFile(c, user, name)
 	if err != nil {
 		sendError(c, http.StatusInternalServerError, "Error opening file: %v", err)
 		return
