@@ -71,9 +71,13 @@ cp example/config.yaml config/config.yaml
 git clone https://github.com/cgang/file-hub.git
 cd file-hub
 
-# 设置数据库
+# 方式 1: 手动设置数据库
 createdb filehub
 psql -d filehub -f scripts/database_schema.sql
+
+# 方式 2: 自动设置数据库（推荐）
+# 这将创建数据库、用户并生成配置文件
+./scripts/init-database.sh
 
 # 使用示例配置构建并运行集成服务（存储在 example/root 中）
 make run

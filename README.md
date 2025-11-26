@@ -71,9 +71,13 @@ cp example/config.yaml config/config.yaml
 git clone https://github.com/cgang/file-hub.git
 cd file-hub
 
-# Setup database
+# Option 1: Manual database setup
 createdb filehub
 psql -d filehub -f scripts/database_schema.sql
+
+# Option 2: Automatic database setup (recommended)
+# This will create the database, user, and generate a config file
+./scripts/init-database.sh
 
 # Build and run the integrated service with example configuration (storage in example/root)
 make run
