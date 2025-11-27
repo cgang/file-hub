@@ -1,5 +1,25 @@
 <script>
+  import { onMount } from 'svelte';
   import FileBrowser from './components/FileBrowser.svelte';
+  import SetupPage from './components/SetupPage.svelte';
+
+  let showSetup = false;
+
+  onMount(async () => {
+    try {
+      // Check if setup is needed by checking if database is empty
+      const response = await fetch('/api/setup');
+      const data = await response.json();
+
+      if (data.setupNeeded) {
+        // If setup is needed, redirect to the setup page
+        window.location.href = '/setup';
+      }
+    } catch (error) {
+      // If there's a network error, we assume setup is not needed
+      console.log('Error checking setup status:', error);
+    }
+  });
 </script>
 
 <main>

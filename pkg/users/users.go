@@ -6,10 +6,31 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/cgang/file-hub/pkg/db"
 )
+
+// Global flag to indicate if the user table has any users
+var (
+	hasAnyUser = false
+	isEmptyMutex      sync.RWMutex
+)
+
+// SetHasAnyUser sets the global flag indicating if the users table has any users
+func SetHasAnyUser(hasUsers bool) {
+	isEmptyMutex.Lock()
+	defer isEmptyMutex.Unlock()
+	hasAnyUser = hasUsers
+}
+
+// HasAnyUser returns the global flag indicating if the users table has any users
+func HasAnyUser() bool {
+	isEmptyMutex.RLock()
+	defer isEmptyMutex.RUnlock()
+	return hasAnyUser
+}
 
 // Service provides user management operations
 type Service struct {
@@ -162,9 +183,42 @@ func (s *Service) Update(id int, req *UpdateUserRequest) error {
 	return s.DB.UpdateUser(id, dbUpdate)
 }
 
-// Delete removes a user (soft delete)
-func (s *Service) Delete(id int) error {
-	return s.DB.DeleteUser(id)
+// CreateFirstUser creates the first user with the provided details, bypassing duplicate checks
+func (s *Service) CreateFirstUser(req *CreateUserRequest) (*User, error) {
+	// Calculate HA1 hash (username:realm:password)
+	ha1 := calculateHA1(req.Username, s.Realm, req.Password)
+
+	// Create the user in the database
+	dbUser := &db.User{
+		Username:  req.Username,
+		Email:     req.Email,
+		HA1:       ha1,
+		Realm:     s.Realm,
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
+		IsActive:  true,
+		IsAdmin:   req.IsAdmin,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	err := s.DB.CreateUser(dbUser)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user: %w", err)
+	}
+
+	return &User{
+		ID:        dbUser.ID,
+		Username:  dbUser.Username,
+		Email:     dbUser.Email,
+		FirstName: dbUser.FirstName,
+		LastName:  dbUser.LastName,
+		CreatedAt: dbUser.CreatedAt,
+		UpdatedAt: dbUser.UpdatedAt,
+		IsActive:  dbUser.IsActive,
+		IsAdmin:   dbUser.IsAdmin,
+		HomeDir:   filepath.Join("/home", dbUser.Username),
+	}, nil
 }
 
 // Authenticate validates a user's credentials for basic authentication

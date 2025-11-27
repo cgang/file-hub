@@ -3,11 +3,18 @@ package auth
 import (
 	"net/http"
 
+	"github.com/cgang/file-hub/pkg/users"
 	"github.com/gin-gonic/gin"
 )
 
 // LoginHandler handles user login requests
 func LoginHandler(c *gin.Context) {
+	// Check if database is empty, redirect to setup page if it is
+	if !users.HasAnyUser() {
+		c.JSON(http.StatusFound, gin.H{"redirect": "/setup"})
+		return
+	}
+
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`

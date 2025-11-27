@@ -29,6 +29,15 @@ func (d *DB) Close() error {
 	return d.DB.Close()
 }
 
+// IsDatabaseEmpty checks if the database is empty (no users exist)
+func (d *DB) IsDatabaseEmpty() (bool, error) {
+	count, err := d.Model((*User)(nil)).Count()
+	if err != nil {
+		return false, fmt.Errorf("failed to count users: %w", err)
+	}
+	return count == 0, nil
+}
+
 // InitDB initializes the database with required tables
 func (d *DB) InitDB() error {
 	models := []interface{}{

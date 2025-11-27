@@ -29,11 +29,18 @@ func main() {
 		log.Panicf("Failed to initialize database: %s", err)
 	}
 
+	// Check if users table is empty and set global flag
+	count, err := database.Model((*db.User)(nil)).Count()
+	if err != nil {
+		log.Panicf("Failed to count users: %s", err)
+	}
+	users.SetHasAnyUser(count > 0)
+
 	// Initialize user service
 	userService := users.NewService(database)
 
 	log.Println("Initializing WebDAV server...")
 	storage := stor.NewStorage(userService)
 
-	web.Start(cfg.Web, storage, userService)
+	web.Start(cfg.Web, storage, userService, database)
 }

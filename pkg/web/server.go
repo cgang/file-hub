@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/cgang/file-hub/pkg/config"
+	"github.com/cgang/file-hub/pkg/db"
 	"github.com/cgang/file-hub/pkg/session"
 	"github.com/cgang/file-hub/pkg/stor"
 	"github.com/cgang/file-hub/pkg/users"
@@ -16,7 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func Start(cfg config.WebConfig, storage stor.Storage, userService *users.Service) {
+func Start(cfg config.WebConfig, storage stor.Storage, userService *users.Service, database *db.DB) {
 	// Set the user service for authentication
 	auth.SetUserService(userService)
 
@@ -33,6 +34,16 @@ func Start(cfg config.WebConfig, storage stor.Storage, userService *users.Servic
 	}
 
 	engine := gin.Default()
+
+	// Add a route for the setup page
+	engine.GET("/setup", func(c *gin.Context) {
+		// Check if database is empty to determine if we should show setup page
+		if !users.HasAnyUser() {
+			c.Redirect(http.StatusFound, "/api/setup")
+			return
+		}
+		c.Redirect(http.StatusFound, "/ui/")
+	})
 
 	api.Register(engine.Group("/api"))
 

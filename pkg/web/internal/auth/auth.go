@@ -15,14 +15,12 @@ var UserService *users.Service
 // SessionStore is the session store instance
 var SessionStore *session.Store
 
-// NonceStore stores nonces for digest authentication
-var nonceStore = NewNonceStore()
-
 // Realm is the authentication realm
 const Realm = "FileHub"
-
-// SessionCookieName is the name of the session cookie
 const SessionCookieName = "filehub_session"
+
+// NonceStore stores nonces for digest authentication
+var nonceStore = NewNonceStore()
 
 // SetUserService sets the user service instance for authentication
 func SetUserService(service *users.Service) {
