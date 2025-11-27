@@ -1,10 +1,10 @@
 package db
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"time"
-
-	"github.com/go-pg/pg/v10"
 )
 
 // CreateUser creates a new user in the database
@@ -13,7 +13,7 @@ func (d *DB) CreateUser(user *User) error {
 	user.CreatedAt = time.Now()
 	user.UpdatedAt = user.CreatedAt
 
-	_, err := d.Model(user).Insert()
+	_, err := d.NewInsert().Model(user).Exec(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
@@ -26,7 +26,7 @@ func (d *DB) CreateUser(user *User) error {
 		UpdatedAt:       time.Now(),
 	}
 
-	_, err = d.Model(quota).Insert()
+	_, err = d.NewInsert().Model(quota).Exec(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to initialize user quota: %w", err)
 	}
@@ -37,12 +37,13 @@ func (d *DB) CreateUser(user *User) error {
 // GetUserByID retrieves a user by ID
 func (d *DB) GetUserByID(id int) (*User, error) {
 	user := &User{ID: id}
-	err := d.Model(user).
-		Where("id = ?id AND is_active = true").
-		Select()
+	err := d.NewSelect().
+		Model(user).
+		Where("id = ? AND is_active = ?", id, true).
+		Scan(context.Background())
 
 	if err != nil {
-		if err == pg.ErrNoRows {
+		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("user not found")
 		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
@@ -54,12 +55,13 @@ func (d *DB) GetUserByID(id int) (*User, error) {
 // GetUserByUsername retrieves a user by username
 func (d *DB) GetUserByUsername(username string) (*User, error) {
 	user := &User{}
-	err := d.Model(user).
-		Where("username = ?username AND is_active = true").
-		Select()
+	err := d.NewSelect().
+		Model(user).
+		Where("username = ? AND is_active = ?", username, true).
+		Scan(context.Background())
 
 	if err != nil {
-		if err == pg.ErrNoRows {
+		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("user not found")
 		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
@@ -71,12 +73,13 @@ func (d *DB) GetUserByUsername(username string) (*User, error) {
 // GetUserByEmail retrieves a user by email
 func (d *DB) GetUserByEmail(email string) (*User, error) {
 	user := &User{}
-	err := d.Model(user).
-		Where("email = ?email AND is_active = true").
-		Select()
+	err := d.NewSelect().
+		Model(user).
+		Where("email = ? AND is_active = ?", email, true).
+		Scan(context.Background())
 
 	if err != nil {
-		if err == pg.ErrNoRows {
+		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("user not found")
 		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
@@ -99,9 +102,9 @@ func (d *DB) UpdateUser(id int, update *UserUpdate) error {
 	user := &User{ID: id}
 
 	// Get the existing user first
-	err := d.Model(user).Where("id = ?id").Select()
+	err := d.NewSelect().Model(user).Where("id = ?", id).Scan(context.Background())
 	if err != nil {
-		if err == pg.ErrNoRows {
+		if err == sql.ErrNoRows {
 			return fmt.Errorf("user not found")
 		}
 		return fmt.Errorf("failed to get user: %w", err)
@@ -126,12 +129,17 @@ func (d *DB) UpdateUser(id int, update *UserUpdate) error {
 
 	user.UpdatedAt = time.Now()
 
-	result, err := d.Model(user).Where("id = ?id").Update()
+	result, err := d.NewUpdate().Model(user).Where("id = ?", id).Exec(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to update user: %w", err)
 	}
 
-	if result.RowsAffected() == 0 {
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
 		return fmt.Errorf("user not found")
 	}
 
@@ -141,13 +149,18 @@ func (d *DB) UpdateUser(id int, update *UserUpdate) error {
 // DeleteUser marks a user as inactive (soft delete)
 func (d *DB) DeleteUser(id int) error {
 	user := &User{ID: id, IsActive: false, UpdatedAt: time.Now()}
-	result, err := d.Model(user).Where("id = ?id").Update()
+	result, err := d.NewUpdate().Model(user).Where("id = ?", id).Exec(context.Background())
 
 	if err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
 
-	if result.RowsAffected() == 0 {
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
 		return fmt.Errorf("user not found")
 	}
 
@@ -157,13 +170,18 @@ func (d *DB) DeleteUser(id int) error {
 // UpdateUserHA1 updates a user's HA1 hash and realm
 func (d *DB) UpdateUserHA1(id int, ha1, realm string) error {
 	user := &User{ID: id, HA1: ha1, Realm: realm, UpdatedAt: time.Now()}
-	result, err := d.Model(user).Where("id = ?id").Update()
+	result, err := d.NewUpdate().Model(user).Where("id = ?", id).Exec(context.Background())
 
 	if err != nil {
 		return fmt.Errorf("failed to update user HA1: %w", err)
 	}
 
-	if result.RowsAffected() == 0 {
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
 		return fmt.Errorf("user not found")
 	}
 

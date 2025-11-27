@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 
 	"github.com/cgang/file-hub/pkg/config"
@@ -30,7 +31,7 @@ func main() {
 	}
 
 	// Check if users table is empty and set global flag
-	count, err := database.Model((*db.User)(nil)).Count()
+	count, err := database.NewSelect().Model((*db.User)(nil)).Count(context.Background())
 	if err != nil {
 		log.Panicf("Failed to count users: %s", err)
 	}

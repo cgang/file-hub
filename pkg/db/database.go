@@ -1,26 +1,28 @@
 package db
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 
-	"github.com/go-pg/pg/v10"
-	"github.com/go-pg/pg/v10/orm"
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
+	"github.com/uptrace/bun/driver/pgdriver"
 )
 
 // DB provides database access methods
 type DB struct {
-	*pg.DB
+	*bun.DB
 }
 
 // New creates a new database connection
 func New(connStr string) (*DB, error) {
-	// Parse connection string to extract options
-	opts, err := pg.ParseURL(connStr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse connection string: %w", err)
-	}
+	// Create a sql.DB connection using pgdriver
+	pgdb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(connStr)))
 
-	db := pg.Connect(opts)
+	// Create a Bun DB instance
+	db := bun.NewDB(pgdb, pgdialect.New())
+
 	return &DB{db}, nil
 }
 
@@ -31,7 +33,7 @@ func (d *DB) Close() error {
 
 // IsDatabaseEmpty checks if the database is empty (no users exist)
 func (d *DB) IsDatabaseEmpty() (bool, error) {
-	count, err := d.Model((*User)(nil)).Count()
+	count, err := d.NewSelect().Model((*User)(nil)).Count(context.Background())
 	if err != nil {
 		return false, fmt.Errorf("failed to count users: %w", err)
 	}
@@ -47,9 +49,7 @@ func (d *DB) InitDB() error {
 	}
 
 	for _, model := range models {
-		err := d.Model(model).CreateTable(&orm.CreateTableOptions{
-			IfNotExists: true,
-		})
+		_, err := d.NewCreateTable().Model(model).IfNotExists().Exec(context.Background())
 		if err != nil {
 			return err
 		}
@@ -60,14 +60,14 @@ func (d *DB) InitDB() error {
 		`CREATE INDEX IF NOT EXISTS idx_files_user_id ON files (user_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_files_path ON files (path);`,
 	} {
-		_, err := d.Exec(query)
+		_, err := d.ExecContext(context.Background(), query)
 		if err != nil {
 			return err
 		}
 	}
 
 	// Set up the trigger function for automatic quota management
-	_, err := d.Exec(`
+	_, err := d.ExecContext(context.Background(), `
 		CREATE OR REPLACE FUNCTION update_user_quota()
 		RETURNS TRIGGER AS $$
 		DECLARE
@@ -105,7 +105,7 @@ func (d *DB) InitDB() error {
 	}
 
 	// Create the trigger if it doesn't exist
-	_, err = d.Exec(`
+	_, err = d.ExecContext(context.Background(), `
 		DO $$
 		BEGIN
 			IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'user_quota_trigger') THEN

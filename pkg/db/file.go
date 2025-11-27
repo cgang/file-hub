@@ -1,10 +1,10 @@
 package db
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"time"
-
-	"github.com/go-pg/pg/v10"
 )
 
 // CreateFile creates a new file record in the database
@@ -13,7 +13,7 @@ func (d *DB) CreateFile(file *File) error {
 	file.CreatedAt = time.Now()
 	file.UpdatedAt = file.CreatedAt
 
-	_, err := d.Model(file).Insert()
+	_, err := d.NewInsert().Model(file).Exec(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
@@ -24,12 +24,13 @@ func (d *DB) CreateFile(file *File) error {
 // GetFileByID retrieves a file by ID
 func (d *DB) GetFileByID(id int) (*File, error) {
 	file := &File{ID: id}
-	err := d.Model(file).
-		Where("id = ?id AND is_deleted = false").
-		Select()
+	err := d.NewSelect().
+		Model(file).
+		Where("id = ? AND is_deleted = ?", id, false).
+		Scan(context.Background())
 
 	if err != nil {
-		if err == pg.ErrNoRows {
+		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("file not found")
 		}
 		return nil, fmt.Errorf("failed to get file: %w", err)
@@ -41,12 +42,13 @@ func (d *DB) GetFileByID(id int) (*File, error) {
 // GetFileByPath retrieves a file by its path
 func (d *DB) GetFileByPath(path string, userID int) (*File, error) {
 	file := &File{}
-	err := d.Model(file).
-		Where("path = ?path AND user_id = ?user_id AND is_deleted = false").
-		Select()
+	err := d.NewSelect().
+		Model(file).
+		Where("path = ? AND user_id = ? AND is_deleted = ?", path, userID, false).
+		Scan(context.Background())
 
 	if err != nil {
-		if err == pg.ErrNoRows {
+		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("file not found")
 		}
 		return nil, fmt.Errorf("failed to get file: %w", err)
@@ -58,10 +60,11 @@ func (d *DB) GetFileByPath(path string, userID int) (*File, error) {
 // GetFilesByUser retrieves all files for a specific user
 func (d *DB) GetFilesByUser(userID int) ([]*File, error) {
 	var files []*File
-	err := d.Model(&files).
-		Where("user_id = ?user_id AND is_deleted = false", userID).
+	err := d.NewSelect().
+		Model(&files).
+		Where("user_id = ? AND is_deleted = ?", userID, false).
 		Order("updated_at DESC").
-		Select()
+		Scan(context.Background())
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get files: %w", err)
@@ -79,11 +82,11 @@ func (d *DB) GetFilesByUserAndPathPrefix(userID int, pathPrefix string) ([]*File
 	}
 
 	var files []*File
-	err := d.Model(&files).
-		Where("user_id = ?user_id AND (path = ?path_prefix OR path LIKE ?path_pattern) AND is_deleted = false",
-		      userID, pathPrefix, pathPrefix+"%").
+	err := d.NewSelect().
+		Model(&files).
+		Where("user_id = ? AND (path = ? OR path LIKE ?) AND is_deleted = ?", userID, pathPrefix, pathPrefix+"%", false).
 		Order("path").
-		Select()
+		Scan(context.Background())
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get files: %w", err)
@@ -107,9 +110,9 @@ func (d *DB) UpdateFile(id int, update *FileUpdate) error {
 	file := &File{ID: id}
 
 	// Get the existing file first
-	err := d.Model(file).Where("id = ?id").Select()
+	err := d.NewSelect().Model(file).Where("id = ?", id).Scan(context.Background())
 	if err != nil {
-		if err == pg.ErrNoRows {
+		if err == sql.ErrNoRows {
 			return fmt.Errorf("file not found")
 		}
 		return fmt.Errorf("failed to get file: %w", err)
@@ -138,12 +141,17 @@ func (d *DB) UpdateFile(id int, update *FileUpdate) error {
 	// Always update updated_at
 	file.UpdatedAt = time.Now()
 
-	result, err := d.Model(file).Where("id = ?id").Update()
+	result, err := d.NewUpdate().Model(file).Where("id = ?", id).Exec(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to update file: %w", err)
 	}
 
-	if result.RowsAffected() == 0 {
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
 		return fmt.Errorf("file not found")
 	}
 
@@ -154,13 +162,18 @@ func (d *DB) UpdateFile(id int, update *FileUpdate) error {
 func (d *DB) DeleteFile(id int) error {
 	now := time.Now()
 	file := &File{ID: id, IsDeleted: true, DeletedAt: &now, UpdatedAt: now}
-	result, err := d.Model(file).Where("id = ?id").Update()
+	result, err := d.NewUpdate().Model(file).Where("id = ?", id).Exec(context.Background())
 
 	if err != nil {
 		return fmt.Errorf("failed to delete file: %w", err)
 	}
 
-	if result.RowsAffected() == 0 {
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
 		return fmt.Errorf("file not found")
 	}
 
@@ -171,15 +184,21 @@ func (d *DB) DeleteFile(id int) error {
 func (d *DB) DeleteFileByPath(path string, userID int) error {
 	now := time.Now()
 	file := &File{IsDeleted: true, DeletedAt: &now, UpdatedAt: now}
-	result, err := d.Model(file).
-		Where("path = ?path AND user_id = ?user_id", path, userID).
-		Update()
+	result, err := d.NewUpdate().
+		Model(file).
+		Where("path = ? AND user_id = ?", path, userID).
+		Exec(context.Background())
 
 	if err != nil {
 		return fmt.Errorf("failed to delete file: %w", err)
 	}
 
-	if result.RowsAffected() == 0 {
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
 		return fmt.Errorf("file not found")
 	}
 
