@@ -10,3 +10,11 @@ database:
   user: "filehub"
   password: "filehub"
   database: "filehub_dev"
+
+# AWS S3 configuration (optional)
+# Uncomment and configure the following section to enable S3 storage
+#s3:
+#  endpoint: "https://s3.amazonaws.com"
+#  region: "us-east-1"
+#  access_key_id: "YOUR_ACCESS_KEY_ID"
+#  secret_access_key: "YOUR_SECRET_ACCESS_KEY"

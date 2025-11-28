@@ -20,10 +20,19 @@ type DatabaseConfig struct {
 	URI string `yaml:"uri"`
 }
 
+// S3Config holds the AWS S3 configuration
+type S3Config struct {
+	Endpoint        string `yaml:"endpoint,omitempty"`
+	Region          string `yaml:"region,omitempty"`
+	AccessKeyID     string `yaml:"access_key_id,omitempty"`
+	SecretAccessKey string `yaml:"secret_access_key,omitempty"`
+}
+
 // Config represents the main application configuration
 type Config struct {
 	Web      WebConfig      `yaml:"web"`
 	Database DatabaseConfig `yaml:"database"`
+	S3       *S3Config      `yaml:"s3,omitempty"`
 }
 
 // getConfigDirs returns a list of directories to search for config files
@@ -104,5 +113,6 @@ func GetDefaultConfig() *Config {
 		Database: DatabaseConfig{
 			URI: "postgresql://filehub:filehub@localhost:5432/filehub",
 		},
+		// S3 configuration is optional and defaults to nil
 	}
 }

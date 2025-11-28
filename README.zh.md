@@ -43,10 +43,19 @@
 
 示例配置在 `example/config.yaml` 中提供：
 ```yaml
-storage:
-  root_dir: "root"  # 相对于 example 目录
-webdav:
-  port: "8080"
+web:
+  port: 8080
+
+database:
+  uri: "postgresql://filehub:filehub@localhost:5432/filehub"
+
+# AWS S3 配置（可选）
+# 取消注释并配置以下部分以启用 S3 存储
+#s3:
+#  endpoint: "https://s3.amazonaws.com"
+#  region: "us-east-1"
+#  access_key_id: "YOUR_ACCESS_KEY_ID"
+#  secret_access_key: "YOUR_SECRET_ACCESS_KEY"
 ```
 
 要自定义服务，请设置包含 config.yaml 的 CONFIG_PATH 环境变量：

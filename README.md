@@ -43,10 +43,19 @@ The service looks for a configuration file at `config/config.yaml` by default. Y
 
 An example configuration is provided in `example/config.yaml`:
 ```yaml
-storage:
-  root_dir: "root"  # Relative to the example directory
-webdav:
-  port: "8080"
+web:
+  port: 8080
+
+database:
+  uri: "postgresql://filehub:filehub@localhost:5432/filehub"
+
+# AWS S3 configuration (optional)
+# Uncomment and configure the following section to enable S3 storage
+#s3:
+#  endpoint: "https://s3.amazonaws.com"
+#  region: "us-east-1"
+#  access_key_id: "YOUR_ACCESS_KEY_ID"
+#  secret_access_key: "YOUR_SECRET_ACCESS_KEY"
 ```
 
 To customize the service, set the CONFIG_PATH environment variable with a directory containing config.yaml:
