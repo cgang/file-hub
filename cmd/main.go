@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"syscall"
 
 	"github.com/cgang/file-hub/pkg/config"
 	"github.com/cgang/file-hub/pkg/db"
@@ -25,10 +26,9 @@ func main() {
 
 	web.Start(ctx, cfg.Web)
 
-	// wait for unix signal to exit
 	// wait for termination signal
 	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, os.Interrupt, os.Kill)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
 	sig := <-sigs
 	log.Printf("Received signal %s, shutting down...", sig)
