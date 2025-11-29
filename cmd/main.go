@@ -9,6 +9,7 @@ import (
 
 	"github.com/cgang/file-hub/pkg/config"
 	"github.com/cgang/file-hub/pkg/db"
+	"github.com/cgang/file-hub/pkg/stor"
 	"github.com/cgang/file-hub/pkg/users"
 	"github.com/cgang/file-hub/pkg/web"
 )
@@ -19,6 +20,9 @@ func main() {
 	if err != nil {
 		log.Panicf("Failed to load config file: %s", err)
 	}
+
+	// Initialize storage with config
+	stor.InitConfig(cfg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	db.Init(ctx, cfg.Database.URI)

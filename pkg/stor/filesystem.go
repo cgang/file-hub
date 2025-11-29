@@ -10,28 +10,21 @@ import (
 	"github.com/cgang/file-hub/pkg/model"
 )
 
-// OsStorage implements Storage using standard OS operations
-type OsStorage struct {
-	user    *model.User
+// fsStorage implements Storage based on the local filesystem
+type fsStorage struct {
+	storage
 	rootDir string
 }
 
-func newFsStorage(user *model.User) *OsStorage {
-	return &OsStorage{
-		user:    user,
-		rootDir: user.HomeDir,
+func newFsStorage(user *model.User, rootDir string) *fsStorage {
+	return &fsStorage{
+		storage: storage{user},
+		rootDir: rootDir,
 	}
 }
 
-func (s *OsStorage) CheckPermission(ctx context.Context, path string, user *model.User, perm Permission) error {
-	// FIXME add real permission checks
-	// For simplicity, we assume all permissions are granted in this example
-	// In a real implementation, check the user's permissions for the given path
-	return nil
-}
-
 // getFullPath combines the user's home directory with the relative path
-func (s *OsStorage) getFullPath(path string) string {
+func (s *fsStorage) getFullPath(path string) string {
 	cleanPath := filepath.Clean(path)
 	fullPath := filepath.Join(s.rootDir, cleanPath)
 
@@ -45,22 +38,22 @@ func (s *OsStorage) getFullPath(path string) string {
 	return fullPath
 }
 
-func (s *OsStorage) CreateFile(ctx context.Context, path string) (*os.File, error) {
+func (s *fsStorage) CreateFile(ctx context.Context, path string) (*os.File, error) {
 	fullPath := s.getFullPath(path)
 	return os.Create(fullPath)
 }
 
-func (s *OsStorage) DeleteFile(ctx context.Context, path string) error {
+func (s *fsStorage) DeleteFile(ctx context.Context, path string) error {
 	fullPath := s.getFullPath(path)
 	return os.RemoveAll(fullPath)
 }
 
-func (s *OsStorage) CreateDir(ctx context.Context, path string) error {
+func (s *fsStorage) CreateDir(ctx context.Context, path string) error {
 	fullPath := s.getFullPath(path)
 	return os.MkdirAll(fullPath, 0755)
 }
 
-func (s *OsStorage) CopyFile(ctx context.Context, src, dst string) error {
+func (s *fsStorage) CopyFile(ctx context.Context, src, dst string) error {
 	// Handle directory or file copy
 	srcFullPath := s.getFullPath(src)
 	dstFullPath := s.getFullPath(dst)
@@ -76,13 +69,13 @@ func (s *OsStorage) CopyFile(ctx context.Context, src, dst string) error {
 	return copyFile(ctx, srcFullPath, dstFullPath)
 }
 
-func (s *OsStorage) MoveFile(ctx context.Context, src, dst string) error {
+func (s *fsStorage) MoveFile(ctx context.Context, src, dst string) error {
 	srcFullPath := s.getFullPath(src)
 	dstFullPath := s.getFullPath(dst)
 	return os.Rename(srcFullPath, dstFullPath)
 }
 
-func (s *OsStorage) GetFileInfo(ctx context.Context, path string) (*FileObject, error) {
+func (s *fsStorage) GetFileInfo(ctx context.Context, path string) (*FileObject, error) {
 	fullPath := s.getFullPath(path)
 	fileInfo, err := os.Stat(fullPath)
 	if err != nil {
@@ -110,7 +103,7 @@ func (s *OsStorage) GetFileInfo(ctx context.Context, path string) (*FileObject, 
 	return file, nil
 }
 
-func (s *OsStorage) ListDir(ctx context.Context, path string) ([]*FileObject, error) {
+func (s *fsStorage) ListDir(ctx context.Context, path string) ([]*FileObject, error) {
 	fullPath := s.getFullPath(path)
 	entries, err := os.ReadDir(fullPath)
 	if err != nil {
@@ -130,12 +123,12 @@ func (s *OsStorage) ListDir(ctx context.Context, path string) ([]*FileObject, er
 	return files, nil
 }
 
-func (s *OsStorage) OpenFile(ctx context.Context, path string) (io.ReadCloser, error) {
+func (s *fsStorage) OpenFile(ctx context.Context, path string) (io.ReadCloser, error) {
 	fullPath := s.getFullPath(path)
 	return os.Open(fullPath)
 }
 
-func (s *OsStorage) WriteToFile(ctx context.Context, path string, content io.Reader) error {
+func (s *fsStorage) WriteToFile(ctx context.Context, path string, content io.Reader) error {
 	// Create directory if needed
 	fullPath := s.getFullPath(path)
 	dirPath := filepath.Dir(fullPath)

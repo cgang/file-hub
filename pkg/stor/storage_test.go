@@ -10,11 +10,6 @@ import (
 	"github.com/cgang/file-hub/pkg/model"
 )
 
-// mockUserService creates a mock user service for testing
-func mockUserService() interface{} {
-	return nil // We won't actually use the service in these tests
-}
-
 // mockUser creates a mock user for testing
 func mockUser(homeDir string) *model.User {
 	return &model.User{
@@ -35,13 +30,13 @@ func stringPtr(s string) *string {
 	return &s
 }
 
-func setupTest(t *testing.T) (*OsStorage, string) {
+func setupTest(t *testing.T) (*fsStorage, string) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 
 	// Create storage with mock user
 	user := mockUser(tempDir)
-	storage := newFsStorage(user)
+	storage := newFsStorage(user, tempDir)
 
 	return storage, tempDir
 }
