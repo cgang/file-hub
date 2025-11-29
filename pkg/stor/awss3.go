@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -24,14 +25,6 @@ type s3Storage struct {
 }
 
 func newS3Storage(user *model.User, cfg *config.S3Config, bucket, prefix string) *s3Storage {
-	if prefix != "" && !strings.HasSuffix(prefix, "/") {
-		prefix = prefix + "/"
-	}
-
-	if prefix == "" {
-		prefix = fmt.Sprintf("%d/", user.ID)
-	}
-
 	opts := &s3.Options{
 		Region:       cfg.Region,
 		Credentials:  credentials.NewStaticCredentialsProvider(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
@@ -65,7 +58,7 @@ func (s *s3Storage) getS3Key(path string) string {
 func (s *s3Storage) getParentKey(path string) string {
 	cleanPath := strings.TrimPrefix(filepath.Clean(path), "/")
 	// Ensure we don not duplicate the user root
-	if after, ok :=strings.CutPrefix(cleanPath, s.userRoot); ok  {
+	if after, ok := strings.CutPrefix(cleanPath, s.userRoot); ok {
 		cleanPath = after
 	}
 	parent := filepath.Dir(cleanPath)
@@ -183,20 +176,9 @@ func (s *s3Storage) GetFileInfo(ctx context.Context, path string) (*FileObject, 
 	// This is a file
 	relPath := strings.TrimPrefix(key, s.userRoot)
 	name := filepath.Base(relPath)
-	contentType := "application/octet-stream"
-	if output.ContentType != nil {
-		contentType = *output.ContentType
-	}
-
-	size := int64(0)
-	if output.ContentLength != nil {
-		size = *output.ContentLength
-	}
-
-	lastModified := time.Now()
-	if output.LastModified != nil {
-		lastModified = *output.LastModified
-	}
+	contentType := aws.ToString(output.ContentType)
+	size := aws.ToInt64(output.ContentLength)
+	lastModified := aws.ToTime(output.LastModified)
 
 	return &FileObject{
 		Name:         name,
@@ -224,17 +206,8 @@ func (s *s3Storage) OpenFile(ctx context.Context, path string) (io.ReadCloser, e
 }
 
 // ListDir lists objects in a directory
-func (s *s3Storage) ListDir(ctx context.Context, path string) ([]*FileObject, error) {
-	prefix := s.getS3Key(path)
-	if prefix != s.userRoot && !strings.HasSuffix(prefix, "/") {
-		prefix = prefix + "/"
-	}
-
-	// Ensure we don't list the root itself
-	if prefix == s.userRoot {
-		prefix = s.userRoot
-	}
-
+func (s *s3Storage) ListDir(ctx context.Context, dir string) ([]*FileObject, error) {
+	prefix := s.getS3Key(dir)
 	output, err := s.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket:    aws.String(s.bucket),
 		Prefix:    aws.String(prefix),
@@ -248,23 +221,18 @@ func (s *s3Storage) ListDir(ctx context.Context, path string) ([]*FileObject, er
 
 	// Add directories
 	for _, prefixObj := range output.CommonPrefixes {
-		if prefixObj.Prefix == nil {
-			continue
-		}
-
+		prefix := aws.ToString(prefixObj.Prefix)
 		// Skip the user root directory
-		if *prefixObj.Prefix == s.userRoot {
+		if prefix == s.userRoot {
 			continue
 		}
 
 		// Extract relative path
-		relPath := strings.TrimPrefix(*prefixObj.Prefix, s.userRoot)
-		dirName := strings.TrimSuffix(relPath, "/")
-		dirBase := filepath.Base(dirName)
-
+		relPath := strings.TrimPrefix(prefix, s.userRoot)
+		base, name := path.Split(relPath)
 		files = append(files, &FileObject{
-			Name:         dirBase,
-			Path:         dirName,
+			Name:         name,
+			Path:         base,
 			IsDir:        true,
 			Size:         0,
 			LastModified: time.Now(), // S3 prefixes don't have modification times
@@ -272,64 +240,22 @@ func (s *s3Storage) ListDir(ctx context.Context, path string) ([]*FileObject, er
 		})
 	}
 
+	// TODO add content type support from database metadata
 	// Add files
 	for _, obj := range output.Contents {
-		if obj.Key == nil {
-			continue
-		}
-
-		// Skip directory markers
-		if strings.HasSuffix(*obj.Key, "/") {
-			continue
-		}
-
-		// Skip the user root object
-		if *obj.Key == s.userRoot {
-			continue
-		}
-
+		key := aws.ToString(obj.Key)
 		// Extract relative path
-		relPath := strings.TrimPrefix(*obj.Key, s.userRoot)
-
-		// Skip if this is not directly in the requested directory
-		if prefix != s.userRoot {
-			expectedPrefix := strings.TrimPrefix(prefix, s.userRoot)
-			if !strings.HasPrefix(relPath, expectedPrefix) {
-				continue
-			}
-
-			// Check if this is a direct child (no more slashes after the prefix)
-			remainingPath := strings.TrimPrefix(relPath, expectedPrefix)
-			if strings.Contains(strings.Trim(remainingPath, "/"), "/") {
-				continue
-			}
-		} else {
-			// For root directory, only include direct children
-			if strings.Contains(strings.Trim(relPath, "/"), "/") {
-				continue
-			}
-		}
-
-		fileName := filepath.Base(relPath)
-		contentType := "application/octet-stream"
-		size := int64(0)
-		lastModified := time.Now()
-
-		if obj.Size != nil {
-			size = *obj.Size
-		}
-
-		if obj.LastModified != nil {
-			lastModified = *obj.LastModified
-		}
+		relPath := strings.TrimPrefix(key, s.userRoot)
+		base, name := path.Split(relPath)
+		size := aws.ToInt64(obj.Size)
+		lastModified := aws.ToTime(obj.LastModified)
 
 		files = append(files, &FileObject{
-			Name:         fileName,
-			Path:         relPath,
+			Name:         name,
+			Path:         base,
 			IsDir:        false,
 			Size:         size,
 			LastModified: lastModified,
-			ContentType:  contentType,
 		})
 	}
 
