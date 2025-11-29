@@ -20,7 +20,7 @@ CREATE TABLE users (
 -- File metadata table to track files on the filesystem
 CREATE TABLE files (
     id SERIAL PRIMARY KEY,                           -- Sequential ID for better performance
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     path TEXT NOT NULL,                             -- Full path including filename relative to WebDAV root
     mime_type VARCHAR(255),
     size BIGINT,                                    -- File size in bytes
@@ -28,7 +28,6 @@ CREATE TABLE files (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     is_deleted BOOLEAN DEFAULT FALSE,                -- For soft delete
-    deleted_at TIMESTAMP WITH TIME ZONE              -- Timestamp when marked as deleted
 );
 
 -- Create indexes for files table
@@ -53,21 +52,21 @@ BEGIN
         UPDATE user_quota
         SET used_bytes = used_bytes + COALESCE(NEW.size, 0),
             updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = NEW.user_id;
+        WHERE user_id = NEW.owner_id;
         RETURN NEW;
     ELSIF (TG_OP = 'UPDATE') THEN
         -- When a file is updated (size changed), adjust used quota
         UPDATE user_quota
         SET used_bytes = used_bytes - COALESCE(OLD.size, 0) + COALESCE(NEW.size, 0),
             updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = NEW.user_id;
+        WHERE user_id = NEW.owner_id;
         RETURN NEW;
     ELSIF (TG_OP = 'DELETE') THEN
         -- When a file is removed, decrease used quota
         UPDATE user_quota
         SET used_bytes = used_bytes - COALESCE(OLD.size, 0),
             updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = OLD.user_id;
+        WHERE user_id = OLD.owner_id;
         RETURN OLD;
     END IF;
     RETURN NULL;

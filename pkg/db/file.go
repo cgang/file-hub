@@ -3,11 +3,16 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/cgang/file-hub/pkg/model"
 	"github.com/uptrace/bun"
+)
+
+var (
+	ErrFileNotFound = errors.New("file not found")
 )
 
 // FileModel represents a file object for database operations
@@ -19,6 +24,15 @@ type FileModel struct {
 func wrapFile(mo *model.FileObject) *FileModel {
 	return &FileModel{FileObject: mo}
 }
+
+func unwrapFiles(mos []*FileModel) []*model.FileObject {
+	files := make([]*model.FileObject, len(mos))
+	for i, mo := range mos {
+		files[i] = mo.FileObject
+	}
+	return files
+}
+
 func newFile(id int) *FileModel {
 	return &FileModel{FileObject: &model.FileObject{ID: id}}
 }
@@ -42,7 +56,7 @@ func GetFileByID(ctx context.Context, id int) (*model.FileObject, error) {
 	file := newFile(id)
 	err := db.NewSelect().
 		Model(file).
-		Where("id = ? AND is_deleted = ?", id, false).
+		Where("id = ? AND deleted = ?", id, false).
 		Scan(ctx)
 
 	if err != nil {
@@ -55,22 +69,37 @@ func GetFileByID(ctx context.Context, id int) (*model.FileObject, error) {
 	return file.FileObject, nil
 }
 
-// GetFileByPath retrieves a file by its path
-func GetFileByPath(ctx context.Context, path string, userID int) (*model.FileObject, error) {
+// GetFile retrieves a file by repository ID and path
+func GetFile(ctx context.Context, reposID int, path string) (*model.FileObject, error) {
 	file := newFile(0)
 	err := db.NewSelect().
 		Model(file).
-		Where("path = ? AND user_id = ? AND is_deleted = ?", path, userID, false).
+		Where("repos_id = ? AND path = ? AND deleted = ?", reposID, path, false).
 		Scan(ctx)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("file not found")
+			return nil, ErrFileNotFound
 		}
 		return nil, fmt.Errorf("failed to get file: %w", err)
 	}
 
 	return file.FileObject, nil
+}
+
+func GetChildFiles(ctx context.Context, parentID int) ([]*model.FileObject, error) {
+	var files []*FileModel
+	err := db.NewSelect().
+		Model(&files).
+		Where("parent_id = ? AND deleted = ?", parentID, false).
+		Order("name ASC").
+		Scan(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get child files: %w", err)
+	}
+
+	return unwrapFiles(files), nil
 }
 
 // GetFilesByUser retrieves all files for a specific user
@@ -78,7 +107,7 @@ func GetFilesByUser(ctx context.Context, userID int) ([]*FileModel, error) {
 	var files []*FileModel
 	err := db.NewSelect().
 		Model(&files).
-		Where("user_id = ? AND is_deleted = ?", userID, false).
+		Where("user_id = ? AND deleted = ?", userID, false).
 		Order("updated_at DESC").
 		Scan(ctx)
 
@@ -100,7 +129,7 @@ func GetFilesByUserAndPathPrefix(ctx context.Context, userID int, pathPrefix str
 	var files []*FileModel
 	err := db.NewSelect().
 		Model(&files).
-		Where("user_id = ? AND (path = ? OR path LIKE ?) AND is_deleted = ?", userID, pathPrefix, pathPrefix+"%", false).
+		Where("user_id = ? AND (path = ? OR path LIKE ?) AND deleted = ?", userID, pathPrefix, pathPrefix+"%", false).
 		Order("path").
 		Scan(ctx)
 
@@ -122,8 +151,6 @@ type FileUpdate struct {
 	Size      *int64     `json:"size,omitempty"`
 	Checksum  *string    `json:"checksum,omitempty"`
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
-	IsDeleted *bool      `json:"is_deleted,omitempty"`
-	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 }
 
 // UpdateFile updates a file in the database
@@ -148,15 +175,6 @@ func UpdateFile(ctx context.Context, id int, update *FileUpdate) error {
 	}
 	if update.Checksum != nil {
 		file.Checksum = update.Checksum
-	}
-	if update.IsDeleted != nil {
-		file.IsDeleted = *update.IsDeleted
-		if update.DeletedAt != nil {
-			file.DeletedAt = update.DeletedAt
-		} else if *update.IsDeleted {
-			now := time.Now()
-			file.DeletedAt = &now
-		}
 	}
 
 	// Always update updated_at

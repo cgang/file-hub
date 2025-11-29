@@ -12,13 +12,11 @@ import (
 
 // fsStorage implements Storage based on the local filesystem
 type fsStorage struct {
-	storage
 	rootDir string
 }
 
 func newFsStorage(user *model.User, rootDir string) *fsStorage {
 	return &fsStorage{
-		storage: storage{user},
 		rootDir: rootDir,
 	}
 }
@@ -73,54 +71,6 @@ func (s *fsStorage) MoveFile(ctx context.Context, src, dst string) error {
 	srcFullPath := s.getFullPath(src)
 	dstFullPath := s.getFullPath(dst)
 	return os.Rename(srcFullPath, dstFullPath)
-}
-
-func (s *fsStorage) GetFileInfo(ctx context.Context, path string) (*FileObject, error) {
-	fullPath := s.getFullPath(path)
-	fileInfo, err := os.Stat(fullPath)
-	if err != nil {
-		return nil, err
-	}
-
-	file := &FileObject{
-		Name:         fileInfo.Name(),
-		Path:         path,
-		IsDir:        fileInfo.IsDir(),
-		Size:         fileInfo.Size(),
-		LastModified: fileInfo.ModTime(),
-		ContentType:  "application/octet-stream",
-	}
-
-	if !file.IsDir {
-		if ext := filepath.Ext(path); ext != "" {
-			contentType := getContentType(ext)
-			if contentType != "" {
-				file.ContentType = contentType
-			}
-		}
-	}
-
-	return file, nil
-}
-
-func (s *fsStorage) ListDir(ctx context.Context, path string) ([]*FileObject, error) {
-	fullPath := s.getFullPath(path)
-	entries, err := os.ReadDir(fullPath)
-	if err != nil {
-		return nil, err
-	}
-
-	files := make([]*FileObject, 0, len(entries))
-	for _, entry := range entries {
-		entryPath := filepath.Join(path, entry.Name())
-		file, err := s.GetFileInfo(ctx, entryPath)
-		if err != nil {
-			continue
-		}
-		files = append(files, file)
-	}
-
-	return files, nil
 }
 
 func (s *fsStorage) OpenFile(ctx context.Context, path string) (io.ReadCloser, error) {

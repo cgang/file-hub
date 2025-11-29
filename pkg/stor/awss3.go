@@ -5,10 +5,8 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"path"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -18,7 +16,6 @@ import (
 )
 
 type s3Storage struct {
-	storage
 	client   *s3.Client
 	bucket   string
 	userRoot string
@@ -34,7 +31,6 @@ func newS3Storage(user *model.User, cfg *config.S3Config, bucket, prefix string)
 	client := s3.New(*opts)
 
 	return &s3Storage{
-		storage:  storage{user},
 		client:   client,
 		bucket:   bucket,
 		userRoot: prefix,
@@ -135,61 +131,6 @@ func (s *s3Storage) MoveFile(ctx context.Context, src, dst string) error {
 	return s.DeleteFile(ctx, src)
 }
 
-// GetFileInfo retrieves metadata for a file or directory
-func (s *s3Storage) GetFileInfo(ctx context.Context, path string) (*FileObject, error) {
-	key := s.getS3Key(path)
-
-	// Try to get object info
-	output, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(key),
-	})
-
-	if err != nil {
-		// If not found, try with trailing slash (directory)
-		dirKey := key
-		if !strings.HasSuffix(key, "/") {
-			dirKey = key + "/"
-		}
-
-		output, err = s.client.HeadObject(ctx, &s3.HeadObjectInput{
-			Bucket: aws.String(s.bucket),
-			Key:    aws.String(dirKey),
-		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		// This is a directory
-		relPath := strings.TrimPrefix(key, s.userRoot)
-		return &FileObject{
-			Name:         filepath.Base(relPath),
-			Path:         relPath,
-			IsDir:        true,
-			Size:         0,
-			LastModified: *output.LastModified,
-			ContentType:  "application/directory",
-		}, nil
-	}
-
-	// This is a file
-	relPath := strings.TrimPrefix(key, s.userRoot)
-	name := filepath.Base(relPath)
-	contentType := aws.ToString(output.ContentType)
-	size := aws.ToInt64(output.ContentLength)
-	lastModified := aws.ToTime(output.LastModified)
-
-	return &FileObject{
-		Name:         name,
-		Path:         relPath,
-		IsDir:        false,
-		Size:         size,
-		LastModified: lastModified,
-		ContentType:  contentType,
-	}, nil
-}
-
 // OpenFile opens a file for reading
 func (s *s3Storage) OpenFile(ctx context.Context, path string) (io.ReadCloser, error) {
 	key := s.getS3Key(path)
@@ -203,63 +144,6 @@ func (s *s3Storage) OpenFile(ctx context.Context, path string) (io.ReadCloser, e
 	}
 
 	return output.Body, nil
-}
-
-// ListDir lists objects in a directory
-func (s *s3Storage) ListDir(ctx context.Context, dir string) ([]*FileObject, error) {
-	prefix := s.getS3Key(dir)
-	output, err := s.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
-		Bucket:    aws.String(s.bucket),
-		Prefix:    aws.String(prefix),
-		Delimiter: aws.String("/"),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	files := make([]*FileObject, 0)
-
-	// Add directories
-	for _, prefixObj := range output.CommonPrefixes {
-		prefix := aws.ToString(prefixObj.Prefix)
-		// Skip the user root directory
-		if prefix == s.userRoot {
-			continue
-		}
-
-		// Extract relative path
-		relPath := strings.TrimPrefix(prefix, s.userRoot)
-		base, name := path.Split(relPath)
-		files = append(files, &FileObject{
-			Name:         name,
-			Path:         base,
-			IsDir:        true,
-			Size:         0,
-			LastModified: time.Now(), // S3 prefixes don't have modification times
-			ContentType:  "application/directory",
-		})
-	}
-
-	// TODO add content type support from database metadata
-	// Add files
-	for _, obj := range output.Contents {
-		key := aws.ToString(obj.Key)
-		// Extract relative path
-		relPath := strings.TrimPrefix(key, s.userRoot)
-		base, name := path.Split(relPath)
-		size := aws.ToInt64(obj.Size)
-		lastModified := aws.ToTime(obj.LastModified)
-
-		files = append(files, &FileObject{
-			Name:         name,
-			Path:         base,
-			IsDir:        false,
-			Size:         size,
-			LastModified: lastModified,
-		})
-	}
-
-	return files, nil
 }
 
 // WriteToFile writes content to a file in S3

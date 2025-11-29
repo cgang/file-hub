@@ -15,7 +15,6 @@ type User struct {
 	LastLogin *time.Time `json:"last_login,omitempty" bun:"last_login"`
 	IsActive  bool       `json:"is_active" bun:"is_active,notnull"`
 	IsAdmin   bool       `json:"is_admin" bun:"is_admin,notnull"`
-	HomeDir   string     `json:"home_dir" bun:"home_dir,notnull"`
 }
 
 type UserQuota struct {

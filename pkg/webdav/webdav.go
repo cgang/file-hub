@@ -2,18 +2,19 @@ package webdav
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
+	"path"
 	"strings"
 	"time"
 
+	"github.com/cgang/file-hub/pkg/db"
 	"github.com/cgang/file-hub/pkg/model"
 	"github.com/cgang/file-hub/pkg/stor"
-	"github.com/cgang/file-hub/pkg/users"
 	"github.com/gin-gonic/gin"
 )
 
@@ -42,14 +43,14 @@ func Register(v1 *gin.RouterGroup) {
 	// Note: Authentication should be handled by a middleware in the calling code
 	v1.Use(setDavHeaders)
 
-	v1.PUT("/:user/*path", handlePut)
-	v1.DELETE("/:user/*path", handleDelete)
-	v1.GET("/:user/*path", handleGet)
+	v1.PUT("/:repos/*path", handlePut)
+	v1.DELETE("/:repos/*path", handleDelete)
+	v1.GET("/:repos/*path", handleGet)
 
-	v1.Handle("PROPFIND", "/:user/*path", handlePropfind)
-	v1.Handle("MKCOL", "/:user/*path", handleMkcol)
-	v1.Handle("COPY", "/:user/*path", handleCopyMove)
-	v1.Handle("MOVE", "/:user/*path", handleCopyMove)
+	v1.Handle("PROPFIND", "/:repos/*path", handlePropfind)
+	v1.Handle("MKCOL", "/:repos/*path", handleMkcol)
+	v1.Handle("COPY", "/:repos/*path", handleCopyMove)
+	v1.Handle("MOVE", "/:repos/*path", handleCopyMove)
 }
 
 // XML structures for WebDAV
@@ -92,21 +93,19 @@ func sendError(c *gin.Context, status int, format string, a ...any) {
 	})
 }
 
-func getUserStorage(c *gin.Context) (stor.Storage, error) {
-	name := c.Param("user")
-	user, err := users.GetByUsername(c, name)
+func getResource(c *gin.Context) (*model.Resource, error) {
+	name := c.Param("repos")
+	repos, err := stor.GetRepository(c, name)
 	if err != nil {
-		sendError(c, http.StatusBadRequest, "Path not found")
-		return nil, fmt.Errorf("get user %s failed: %w", name, err)
+		sendError(c, http.StatusBadRequest, "Repository not found")
+		return nil, fmt.Errorf("get repository %s failed: %w", name, err)
 	}
 
-	userStorage, err := stor.ForUser(c, user)
-	if err != nil {
-		sendError(c, http.StatusBadRequest, "Path not found")
-		return nil, fmt.Errorf("get storage for user %s failed: %w", name, err)
-	}
-
-	return userStorage, nil
+	return &model.Resource{
+		ReposID: repos.ID,
+		OwnerID: repos.OwnerID,
+		Path:    strings.TrimPrefix(c.Param("path"), "/"),
+	}, nil
 }
 
 // handlePropfind handles PROPFIND requests
@@ -118,72 +117,64 @@ func handlePropfind(c *gin.Context) {
 		return
 	}
 
-	storage, err := getUserStorage(c)
+	resource, err := getResource(c)
 	if err != nil {
 		return
 	}
 
-	name := c.Param("path")
 	// Log request
-	log.Printf("Handling PROPFIND request for %s", name)
+	log.Printf("Handling PROPFIND request for %s", resource)
 
-	if err := storage.CheckPermission(c, name, user, stor.PermissionRead); err != nil {
-		log.Printf("Permission denied for %s: %v", name, err)
+	if err := stor.CheckPermission(c, user.ID, resource, stor.PermissionRead); err != nil {
+		log.Printf("Permission denied for %s: %v", resource, err)
 		sendError(c, http.StatusForbidden, "Permission denied")
-		return
-	}
-
-	// Get file info using storage abstraction
-	file, err := storage.GetFileInfo(c, name)
-	if err != nil {
-		if os.IsNotExist(err) {
-			log.Printf("File not found: %s", name)
-			sendError(c, http.StatusNotFound, "File not found")
-			return
-		}
-		log.Printf("Error accessing file %s: %v", name, err)
-		sendError(c, http.StatusInternalServerError, "Error accessing file: %v", err)
 		return
 	}
 
 	// Build response
 	var ms Multistatus
 
-	// Add the file/directory itself
-	ms.Response = append(ms.Response, createResponse(c.Request.URL.Path, file))
-
-	// If it's a directory, list its contents
-	if file.IsDir {
-		files, err := storage.ListDir(c, name)
-		if err != nil {
-			log.Printf("Error reading directory %s: %v", name, err)
-			sendError(c, http.StatusInternalServerError, "Failed to read directory: %v", err)
+	// Get file info using storage abstraction
+	file, err := stor.GetFileInfo(c, resource)
+	if err != nil {
+		if errors.Is(err, db.ErrFileNotFound) {
+			sendError(c, http.StatusNotFound, "File not found")
 			return
 		}
 
-		// Add each entry to the response
-		for _, entry := range files {
-			entryUrlPath := strings.TrimSuffix(c.Request.URL.Path, "/") + "/" + entry.Name
-			ms.Response = append(ms.Response, createResponse(entryUrlPath, entry))
-		}
+		log.Printf("Error accessing file %s: %v", resource, err)
+		sendError(c, http.StatusInternalServerError, "Error accessing file: %v", err)
+		return
 	}
 
-	// Log response
-	log.Printf("Sending PROPFIND response for %s with %d items", name, len(ms.Response))
+	// Add the file/directory itself
+	ms.Response = append(ms.Response, createResponse(c.Request.URL.Path, file))
+	// If it's a directory, list its contents
+	files, err := stor.ListDir(c, file)
+	if err != nil {
+		log.Printf("Error reading directory %s: %v", resource, err)
+		sendError(c, http.StatusInternalServerError, "Failed to read directory: %v", err)
+		return
+	}
 
-	// Set XML content type and send response
-	c.XML(http.StatusOK, ms)
+	for _, entry := range files {
+		entryUrlPath := strings.TrimSuffix(c.Request.URL.Path, "/") + "/" + entry.Path
+		ms.Response = append(ms.Response, createResponse(entryUrlPath, entry))
+	}
+
+	c.XML(http.StatusOK, &ms)
 }
 
 // createResponse creates a WebDAV response with proper properties
-func createResponse(href string, file *stor.FileObject) Response {
+func createResponse(href string, file *model.FileObject) Response {
+	name := path.Base(file.Path)
 	prop := Prop{
-		Name:         file.Name,
-		DisplayName:  file.Name,
-		LastModified: file.LastModified.UTC().Format(time.RFC1123),
+		Name:         name,
+		DisplayName:  name,
+		LastModified: file.UpdatedAt.UTC().Format(time.RFC1123),
 	}
 
-	if file.IsDir {
+	if file.Directory {
 		prop.IsCollection = "1"
 		prop.ContentType = "httpd/unix-directory"
 	} else {
@@ -208,21 +199,18 @@ func handlePut(c *gin.Context) {
 		return
 	}
 
-	storage, err := getUserStorage(c)
+	resource, err := getResource(c)
 	if err != nil {
 		return
 	}
 
-	name := c.Param("path")
-
-	if err := storage.CheckPermission(c, name, user, stor.PermissionWrite); err != nil {
-		log.Printf("Permission denied for %s: %v", name, err)
+	if err := stor.CheckPermission(c, user.ID, resource, stor.PermissionWrite); err != nil {
 		sendError(c, http.StatusForbidden, "Permission denied")
 		return
 	}
 
 	// Write file using storage abstraction
-	if err := storage.WriteToFile(c, name, c.Request.Body); err != nil {
+	if err := stor.WriteToFile(c, resource, c.Request.Body); err != nil {
 		sendError(c, http.StatusInternalServerError, "Failed to write file: %v", err)
 		return
 	}
@@ -239,19 +227,18 @@ func handleDelete(c *gin.Context) {
 		return
 	}
 
-	storage, err := getUserStorage(c)
+	resource, err := getResource(c)
 	if err != nil {
 		return
 	}
 
-	name := c.Param("path")
-	if err := storage.CheckPermission(c, name, user, stor.PermissionDelete); err != nil {
-		log.Printf("Permission denied for %s: %v", name, err)
+	if err := stor.CheckPermission(c, user.ID, resource, stor.PermissionDelete); err != nil {
+		log.Printf("Permission denied for %s: %v", resource, err)
 		sendError(c, http.StatusForbidden, "Permission denied")
 		return
 	}
 
-	if err := storage.DeleteFile(c, name); err != nil {
+	if err := stor.DeleteFile(c, resource); err != nil {
 		sendError(c, http.StatusInternalServerError, "Failed to delete file: %v", err)
 		return
 	}
@@ -267,19 +254,18 @@ func handleMkcol(c *gin.Context) {
 		return
 	}
 
-	storage, err := getUserStorage(c)
+	resource, err := getResource(c)
 	if err != nil {
 		return
 	}
 
-	name := c.Param("path")
-	if err := storage.CheckPermission(c, name, user, stor.PermissionWrite); err != nil {
-		log.Printf("Permission denied for %s: %v", name, err)
+	if err := stor.CheckPermission(c, user.ID, resource, stor.PermissionWrite); err != nil {
+		log.Printf("Permission denied for %s: %v", resource, err)
 		sendError(c, http.StatusForbidden, "Permission denied")
 		return
 	}
 
-	if err := storage.CreateDir(c, name); err != nil {
+	if err := stor.CreateDir(c, resource); err != nil {
 		sendError(c, http.StatusInternalServerError, "Failed to create directory: %v", err)
 		return
 	}
@@ -295,45 +281,54 @@ func handleCopyMove(c *gin.Context) {
 		return
 	}
 
-	storage, err := getUserStorage(c)
+	resource, err := getResource(c)
 	if err != nil {
 		return
 	}
 
-	srcPath := c.Param("path")
 	destination := c.Request.Header.Get("Destination")
-	if destination == "" {
+	if destination == "" || !strings.HasPrefix(destination, "/dav") { // TODO fix hardcoded path
 		sendError(c, http.StatusBadRequest, "Destination header required")
 		return
 	}
 
 	// Parse destination path
-	destPath := strings.TrimPrefix(destination, "/")
+	var destResource *model.Resource
+	destPath := strings.TrimPrefix(destination, "/dav")
+	if repos, name, ok := strings.Cut(destPath, "/"); ok {
+		r, err := stor.GetRepository(c, repos)
+		if err != nil {
+			sendError(c, http.StatusBadRequest, "Destination repository not found")
+			return
+		}
 
-	if err := storage.CheckPermission(c, srcPath, user, stor.PermissionRead); err != nil {
-		log.Printf("Permission denied for source %s: %v", srcPath, err)
+		destResource = &model.Resource{
+			ReposID: r.ID, // TODO lookup repository ID
+			OwnerID: user.ID,
+			Path:    name,
+		}
+	}
+
+	if err := stor.CheckPermission(c, user.ID, resource, stor.PermissionRead); err != nil {
 		sendError(c, http.StatusForbidden, "Permission denied for source")
 		return
 	}
 
-	// TODO check permission on destination parent directory
-
-	// Create destination directory if needed
-	if err := storage.CreateDir(c, filepath.Dir(destPath)); err != nil {
-		sendError(c, http.StatusInternalServerError, "Failed to create destination directory: %v", err)
+	if err := stor.CheckPermission(c, user.ID, destResource, stor.PermissionWrite); err != nil {
+		sendError(c, http.StatusForbidden, "Permission denied for destination")
 		return
 	}
 
 	// Handle COPY or MOVE
 	if c.Request.Method == "COPY" {
 		// Copy file/directory using storage
-		if err := storage.CopyFile(c, srcPath, destPath); err != nil {
+		if err := stor.CopyFile(c, resource, destResource); err != nil {
 			sendError(c, http.StatusInternalServerError, "Failed to copy file: %v", err)
 			return
 		}
 	} else {
 		// Move file/directory using storage
-		if err := storage.MoveFile(c, srcPath, destPath); err != nil {
+		if err := stor.MoveFile(c, resource, destResource); err != nil {
 			sendError(c, http.StatusInternalServerError, "Failed to move file: %v", err)
 			return
 		}
@@ -351,20 +346,18 @@ func handleGet(c *gin.Context) {
 		return
 	}
 
-	storage, err := getUserStorage(c)
+	resource, err := getResource(c)
 	if err != nil {
 		return
 	}
 
-	name := c.Param("path")
-
-	if err := storage.CheckPermission(c, name, user, stor.PermissionRead); err != nil {
-		log.Printf("Permission denied for %s: %v", name, err)
+	if err := stor.CheckPermission(c, user.ID, resource, stor.PermissionRead); err != nil {
+		log.Printf("Permission denied for %s: %v", resource, err)
 		sendError(c, http.StatusForbidden, "Permission denied")
 		return
 	}
 
-	info, err := storage.GetFileInfo(c, name)
+	info, err := stor.GetFileInfo(c, resource)
 	if err != nil {
 		if os.IsNotExist(err) {
 			sendError(c, http.StatusNotFound, "File not found")
@@ -374,7 +367,7 @@ func handleGet(c *gin.Context) {
 		return
 	}
 
-	if info.IsDir {
+	if info.Directory {
 		sendError(c, http.StatusBadRequest, "Cannot GET a directory")
 		return
 	}
@@ -382,7 +375,7 @@ func handleGet(c *gin.Context) {
 	c.Header("Content-Type", info.ContentType)
 	c.Header("Content-Length", fmt.Sprintf("%d", info.Size))
 
-	file, err := storage.OpenFile(c, name)
+	file, err := stor.OpenFile(c, resource)
 	if err != nil {
 		sendError(c, http.StatusInternalServerError, "Error opening file: %v", err)
 		return
