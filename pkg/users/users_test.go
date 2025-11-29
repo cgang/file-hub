@@ -25,34 +25,6 @@ func TestCalculateHA1(t *testing.T) {
 	assert.NotEqual(t, ha1, differentHA1)
 }
 
-func TestCalculateHA2(t *testing.T) {
-	ha2 := calculateHA2("GET", "/test")
-	assert.NotEmpty(t, ha2)
-	assert.Len(t, ha2, 32) // MD5 produces 32 character hex string
-
-	// Same inputs should produce same output
-	ha2Again := calculateHA2("GET", "/test")
-	assert.Equal(t, ha2, ha2Again)
-
-	// Different inputs should produce different output
-	differentHA2 := calculateHA2("POST", "/test")
-	assert.NotEqual(t, ha2, differentHA2)
-}
-
-func TestCalculateResponse(t *testing.T) {
-	response := calculateResponse("ha1", "nonce", "nc", "cnonce", "qop", "ha2")
-	assert.NotEmpty(t, response)
-	assert.Len(t, response, 32) // MD5 produces 32 character hex string
-
-	// Same inputs should produce same output
-	responseAgain := calculateResponse("ha1", "nonce", "nc", "cnonce", "qop", "ha2")
-	assert.Equal(t, response, responseAgain)
-
-	// Different inputs should produce different output
-	differentResponse := calculateResponse("ha1", "different", "nc", "cnonce", "qop", "ha2")
-	assert.NotEqual(t, response, differentResponse)
-}
-
 func TestUserCreationRequestValidation(t *testing.T) {
 	// Test that our request structs have the right tags
 	req := &CreateUserRequest{

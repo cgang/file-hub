@@ -2,8 +2,6 @@ package users
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -13,8 +11,7 @@ import (
 )
 
 var (
-	initUserCount int32
-	userRealm     string
+	userRealm string
 )
 
 // NewService creates a new user service
@@ -133,104 +130,4 @@ func CreateFirstUser(ctx context.Context, req *CreateUserRequest) (*model.User, 
 	}
 
 	return user, nil
-}
-
-// Authenticate validates a user's credentials for basic authentication
-func Authenticate(ctx context.Context, username, password string) (*model.User, error) {
-	// Get user by username
-	user, err := db.GetUserByUsername(ctx, username)
-	if err != nil {
-		return nil, errors.New("invalid credentials")
-	}
-
-	// Calculate HA1 hash from provided credentials
-	providedHA1 := calculateHA1(username, password)
-
-	// Compare hashes using constant time comparison
-	if !compareHA1(user.HA1, providedHA1) {
-		return nil, errors.New("invalid credentials")
-	}
-
-	// Update last login time
-	now := time.Now()
-	updateReq := &UpdateUserRequest{
-		LastLogin: &now,
-	}
-
-	err = Update(ctx, user.ID, updateReq)
-	if err != nil {
-		// Log error but don't fail authentication
-		// In a production system, you'd want to log this properly
-	}
-
-	return user, nil
-}
-
-// ValidateDigest validates a user's credentials for digest authentication
-func ValidateDigest(ctx context.Context, username, uri, nonce, nc, cnonce, qop, response, method string) (*model.User, error) {
-	// Get user by username
-	user, err := db.GetUserByUsername(ctx, username)
-	if err != nil {
-		return nil, errors.New("invalid credentials")
-	}
-
-	// Calculate HA2
-	ha2 := calculateHA2(method, uri)
-
-	// Calculate the expected response using the stored HA1
-	expectedResponse := calculateResponse(user.HA1, nonce, nc, cnonce, qop, ha2)
-
-	// Compare responses using constant time comparison
-	if !compareResponse(response, expectedResponse) {
-		return nil, errors.New("invalid credentials")
-	}
-
-	// Update last login time
-	now := time.Now()
-	updateReq := &UpdateUserRequest{
-		LastLogin: &now,
-	}
-
-	err = Update(ctx, user.ID, updateReq)
-	if err != nil {
-		// Log error but don't fail authentication
-		// In a production system, you'd want to log this properly
-	}
-
-	return user, nil
-}
-
-// calculateHA1 calculates the HA1 value for digest authentication
-func calculateHA1(username, password string) string {
-	// HA1 = MD5(username:realm:password)
-	ha1 := md5.Sum([]byte(fmt.Sprintf("%s:%s:%s", username, userRealm, password)))
-	return hex.EncodeToString(ha1[:])
-}
-
-// calculateHA2 calculates the HA2 value for digest authentication
-func calculateHA2(method, uri string) string {
-	// HA2 = MD5(method:uri)
-	ha2 := md5.Sum([]byte(fmt.Sprintf("%s:%s", method, uri)))
-	return hex.EncodeToString(ha2[:])
-}
-
-// calculateResponse calculates the expected response for digest authentication
-func calculateResponse(ha1, nonce, nc, cnonce, qop, ha2 string) string {
-	// response = MD5(HA1:nonce:nc:cnonce:qop:HA2)
-	resp := md5.Sum([]byte(fmt.Sprintf("%s:%s:%s:%s:%s:%s", ha1, nonce, nc, cnonce, qop, ha2)))
-	return hex.EncodeToString(resp[:])
-}
-
-// compareHA1 compares two HA1 hashes using constant time comparison
-func compareHA1(ha1, providedHA1 string) bool {
-	// In a real implementation, you would use crypto/subtle.ConstantTimeCompare
-	// For now, we'll use a simple comparison
-	return ha1 == providedHA1
-}
-
-// compareResponse compares two responses using constant time comparison
-func compareResponse(response, expectedResponse string) bool {
-	// In a real implementation, you would use crypto/subtle.ConstantTimeCompare
-	// For now, we'll use a simple comparison
-	return response == expectedResponse
 }

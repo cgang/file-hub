@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/cgang/file-hub/pkg/users"
-	"github.com/cgang/file-hub/pkg/web/internal/auth"
+	"github.com/cgang/file-hub/pkg/web/auth"
 	"github.com/gin-gonic/gin"
 )
 

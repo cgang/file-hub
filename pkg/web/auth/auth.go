@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/cgang/file-hub/pkg/model"
-	"github.com/cgang/file-hub/pkg/session"
+	"github.com/cgang/file-hub/pkg/web/session"
 	"github.com/gin-gonic/gin"
 )
 
