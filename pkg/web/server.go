@@ -1,13 +1,13 @@
 package web
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/cgang/file-hub/pkg/config"
 	"github.com/cgang/file-hub/pkg/session"
-	"github.com/cgang/file-hub/pkg/stor"
 	"github.com/cgang/file-hub/pkg/users"
 	"github.com/cgang/file-hub/pkg/web/api"
 	"github.com/cgang/file-hub/pkg/web/internal/auth"
@@ -18,15 +18,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-func Start(cfg config.WebConfig, storage stor.Storage, userService *users.Service) {
-	// Set the user service for authentication
-	auth.SetUserService(userService)
+func Start(ctx context.Context, cfg config.WebConfig) {
 
 	// Initialize session store
 	sessionStore := session.NewStore()
 	auth.SetSessionStore(sessionStore)
-
-	webdavServer := webdav.New(storage)
 
 	// Create a sub filesystem from the embedded files
 	uiFiles, err := web.StaticFiles()
@@ -39,7 +35,7 @@ func Start(cfg config.WebConfig, storage stor.Storage, userService *users.Servic
 	// Add a route for the setup page
 	engine.GET("/setup", func(c *gin.Context) {
 		// Check if database is empty to determine if we should show setup page
-		if !users.HasAnyUser() {
+		if ok, err := users.HasAnyUser(context.Background()); err != nil || !ok {
 			c.Redirect(http.StatusFound, "/ui/setup")
 			return
 		}
@@ -61,7 +57,7 @@ func Start(cfg config.WebConfig, storage stor.Storage, userService *users.Servic
 	// Register WebDAV with authentication middleware
 	webdavGroup := engine.Group("/dav")
 	webdavGroup.Use(auth.Authenticate)
-	webdavServer.Register(webdavGroup)
+	webdav.Register(webdavGroup)
 
 	engine.StaticFS("/ui", uiFiles)
 	engine.GET("/", func(c *gin.Context) {
@@ -73,4 +69,8 @@ func Start(cfg config.WebConfig, storage stor.Storage, userService *users.Servic
 	if err := engine.Run(addr); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+func Stop(ctx context.Context) {
+	// TODO shutdown server gracefully
 }

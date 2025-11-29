@@ -32,6 +32,7 @@ type S3Config struct {
 
 // Config represents the main application configuration
 type Config struct {
+	Realm    string         `yaml:"realm,omitempty"`
 	Web      WebConfig      `yaml:"web"`
 	Database DatabaseConfig `yaml:"database"`
 	S3       *S3Config      `yaml:"s3,omitempty"`
@@ -84,7 +85,7 @@ func LoadConfig(filename string) (*Config, error) {
 	return nil, fmt.Errorf("no config.yaml file found in CONFIG_PATH directories")
 }
 
-func loadYamlFile(filename string, out interface{}) error {
+func loadYamlFile(filename string, out any) error {
 	file, err := os.Open(filename)
 	if err != nil {
 		return err

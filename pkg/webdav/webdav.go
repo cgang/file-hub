@@ -11,22 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cgang/file-hub/pkg/model"
 	"github.com/cgang/file-hub/pkg/stor"
 	"github.com/cgang/file-hub/pkg/users"
 	"github.com/gin-gonic/gin"
 )
-
-// WebDAV provides WebDAV server functionality
-type WebDAV struct {
-	storage stor.Storage
-}
-
-// New creates a new WebDAV server
-func New(storage stor.Storage) *WebDAV {
-	return &WebDAV{
-		storage: storage,
-	}
-}
 
 func setDavHeaders(c *gin.Context) {
 	c.Header("DAV", "1")
@@ -34,13 +23,13 @@ func setDavHeaders(c *gin.Context) {
 }
 
 // getAuthenticatedUser retrieves the authenticated user from the context
-func getAuthenticatedUser(c *gin.Context) (*users.User, error) {
+func getAuthenticatedUser(c *gin.Context) (*model.User, error) {
 	userValue, exists := c.Get("user")
 	if !exists {
 		return nil, fmt.Errorf("no authenticated user found")
 	}
 
-	user, ok := userValue.(*users.User)
+	user, ok := userValue.(*model.User)
 	if !ok {
 		return nil, fmt.Errorf("invalid user type in context")
 	}
@@ -49,18 +38,18 @@ func getAuthenticatedUser(c *gin.Context) (*users.User, error) {
 }
 
 // Register configures the WebDAV routes
-func (h *WebDAV) Register(v1 *gin.RouterGroup) {
+func Register(v1 *gin.RouterGroup) {
 	// Note: Authentication should be handled by a middleware in the calling code
 	v1.Use(setDavHeaders)
 
-	v1.PUT("/*path", h.handlePut)
-	v1.DELETE("/*path", h.handleDelete)
-	v1.GET("/*path", h.handleGet)
+	v1.PUT("/:user/*path", handlePut)
+	v1.DELETE("/:user/*path", handleDelete)
+	v1.GET("/:user/*path", handleGet)
 
-	v1.Handle("PROPFIND", "/*path", h.handlePropfind)
-	v1.Handle("MKCOL", "/*path", h.handleMkcol)
-	v1.Handle("COPY", "/*path", h.handleCopyMove)
-	v1.Handle("MOVE", "/*path", h.handleCopyMove)
+	v1.Handle("PROPFIND", "/:user/*path", handlePropfind)
+	v1.Handle("MKCOL", "/:user/*path", handleMkcol)
+	v1.Handle("COPY", "/:user/*path", handleCopyMove)
+	v1.Handle("MOVE", "/:user/*path", handleCopyMove)
 }
 
 // XML structures for WebDAV
@@ -103,8 +92,25 @@ func sendError(c *gin.Context, status int, format string, a ...any) {
 	})
 }
 
+func getUserStorage(c *gin.Context) (stor.Storage, error) {
+	name := c.Param("user")
+	user, err := users.GetByUsername(c, name)
+	if err != nil {
+		sendError(c, http.StatusBadRequest, "Path not found")
+		return nil, fmt.Errorf("get user %s failed: %w", name, err)
+	}
+
+	userStorage, err := stor.ForUser(c, user)
+	if err != nil {
+		sendError(c, http.StatusBadRequest, "Path not found")
+		return nil, fmt.Errorf("get storage for user %s failed: %w", name, err)
+	}
+
+	return userStorage, nil
+}
+
 // handlePropfind handles PROPFIND requests
-func (h *WebDAV) handlePropfind(c *gin.Context) {
+func handlePropfind(c *gin.Context) {
 	// Get authenticated user
 	user, err := getAuthenticatedUser(c)
 	if err != nil {
@@ -112,12 +118,23 @@ func (h *WebDAV) handlePropfind(c *gin.Context) {
 		return
 	}
 
+	storage, err := getUserStorage(c)
+	if err != nil {
+		return
+	}
+
 	name := c.Param("path")
 	// Log request
 	log.Printf("Handling PROPFIND request for %s", name)
 
+	if err := storage.CheckPermission(c, name, user, stor.PermissionRead); err != nil {
+		log.Printf("Permission denied for %s: %v", name, err)
+		sendError(c, http.StatusForbidden, "Permission denied")
+		return
+	}
+
 	// Get file info using storage abstraction
-	file, err := h.storage.GetFileInfo(c, user, name)
+	file, err := storage.GetFileInfo(c, name)
 	if err != nil {
 		if os.IsNotExist(err) {
 			log.Printf("File not found: %s", name)
@@ -137,7 +154,7 @@ func (h *WebDAV) handlePropfind(c *gin.Context) {
 
 	// If it's a directory, list its contents
 	if file.IsDir {
-		files, err := h.storage.ListDir(c, user, name)
+		files, err := storage.ListDir(c, name)
 		if err != nil {
 			log.Printf("Error reading directory %s: %v", name, err)
 			sendError(c, http.StatusInternalServerError, "Failed to read directory: %v", err)
@@ -159,7 +176,7 @@ func (h *WebDAV) handlePropfind(c *gin.Context) {
 }
 
 // createResponse creates a WebDAV response with proper properties
-func createResponse(href string, file *stor.File) Response {
+func createResponse(href string, file *stor.FileObject) Response {
 	prop := Prop{
 		Name:         file.Name,
 		DisplayName:  file.Name,
@@ -183,7 +200,7 @@ func createResponse(href string, file *stor.File) Response {
 }
 
 // handlePut handles PUT requests
-func (h *WebDAV) handlePut(c *gin.Context) {
+func handlePut(c *gin.Context) {
 	// Get authenticated user
 	user, err := getAuthenticatedUser(c)
 	if err != nil {
@@ -191,9 +208,21 @@ func (h *WebDAV) handlePut(c *gin.Context) {
 		return
 	}
 
+	storage, err := getUserStorage(c)
+	if err != nil {
+		return
+	}
+
 	name := c.Param("path")
+
+	if err := storage.CheckPermission(c, name, user, stor.PermissionWrite); err != nil {
+		log.Printf("Permission denied for %s: %v", name, err)
+		sendError(c, http.StatusForbidden, "Permission denied")
+		return
+	}
+
 	// Write file using storage abstraction
-	if err := h.storage.WriteToFile(c, user, name, c.Request.Body); err != nil {
+	if err := storage.WriteToFile(c, name, c.Request.Body); err != nil {
 		sendError(c, http.StatusInternalServerError, "Failed to write file: %v", err)
 		return
 	}
@@ -202,7 +231,7 @@ func (h *WebDAV) handlePut(c *gin.Context) {
 }
 
 // handleDelete handles DELETE requests
-func (h *WebDAV) handleDelete(c *gin.Context) {
+func handleDelete(c *gin.Context) {
 	// Get authenticated user
 	user, err := getAuthenticatedUser(c)
 	if err != nil {
@@ -210,8 +239,19 @@ func (h *WebDAV) handleDelete(c *gin.Context) {
 		return
 	}
 
+	storage, err := getUserStorage(c)
+	if err != nil {
+		return
+	}
+
 	name := c.Param("path")
-	if err := h.storage.DeleteFile(c, user, name); err != nil {
+	if err := storage.CheckPermission(c, name, user, stor.PermissionDelete); err != nil {
+		log.Printf("Permission denied for %s: %v", name, err)
+		sendError(c, http.StatusForbidden, "Permission denied")
+		return
+	}
+
+	if err := storage.DeleteFile(c, name); err != nil {
 		sendError(c, http.StatusInternalServerError, "Failed to delete file: %v", err)
 		return
 	}
@@ -219,7 +259,7 @@ func (h *WebDAV) handleDelete(c *gin.Context) {
 }
 
 // handleMkcol handles MKCOL requests
-func (h *WebDAV) handleMkcol(c *gin.Context) {
+func handleMkcol(c *gin.Context) {
 	// Get authenticated user
 	user, err := getAuthenticatedUser(c)
 	if err != nil {
@@ -227,8 +267,19 @@ func (h *WebDAV) handleMkcol(c *gin.Context) {
 		return
 	}
 
+	storage, err := getUserStorage(c)
+	if err != nil {
+		return
+	}
+
 	name := c.Param("path")
-	if err := h.storage.CreateDir(c, user, name); err != nil {
+	if err := storage.CheckPermission(c, name, user, stor.PermissionWrite); err != nil {
+		log.Printf("Permission denied for %s: %v", name, err)
+		sendError(c, http.StatusForbidden, "Permission denied")
+		return
+	}
+
+	if err := storage.CreateDir(c, name); err != nil {
 		sendError(c, http.StatusInternalServerError, "Failed to create directory: %v", err)
 		return
 	}
@@ -236,11 +287,16 @@ func (h *WebDAV) handleMkcol(c *gin.Context) {
 }
 
 // handleCopyMove handles COPY and MOVE requests
-func (h *WebDAV) handleCopyMove(c *gin.Context) {
+func handleCopyMove(c *gin.Context) {
 	// Get authenticated user
 	user, err := getAuthenticatedUser(c)
 	if err != nil {
 		sendError(c, http.StatusUnauthorized, "Authentication required")
+		return
+	}
+
+	storage, err := getUserStorage(c)
+	if err != nil {
 		return
 	}
 
@@ -254,8 +310,16 @@ func (h *WebDAV) handleCopyMove(c *gin.Context) {
 	// Parse destination path
 	destPath := strings.TrimPrefix(destination, "/")
 
+	if err := storage.CheckPermission(c, srcPath, user, stor.PermissionRead); err != nil {
+		log.Printf("Permission denied for source %s: %v", srcPath, err)
+		sendError(c, http.StatusForbidden, "Permission denied for source")
+		return
+	}
+
+	// TODO check permission on destination parent directory
+
 	// Create destination directory if needed
-	if err := h.storage.CreateDir(c, user, filepath.Dir(destPath)); err != nil {
+	if err := storage.CreateDir(c, filepath.Dir(destPath)); err != nil {
 		sendError(c, http.StatusInternalServerError, "Failed to create destination directory: %v", err)
 		return
 	}
@@ -263,13 +327,13 @@ func (h *WebDAV) handleCopyMove(c *gin.Context) {
 	// Handle COPY or MOVE
 	if c.Request.Method == "COPY" {
 		// Copy file/directory using storage
-		if err := h.storage.CopyFile(c, user, srcPath, destPath); err != nil {
+		if err := storage.CopyFile(c, srcPath, destPath); err != nil {
 			sendError(c, http.StatusInternalServerError, "Failed to copy file: %v", err)
 			return
 		}
 	} else {
 		// Move file/directory using storage
-		if err := h.storage.MoveFile(c, user, srcPath, destPath); err != nil {
+		if err := storage.MoveFile(c, srcPath, destPath); err != nil {
 			sendError(c, http.StatusInternalServerError, "Failed to move file: %v", err)
 			return
 		}
@@ -279,7 +343,7 @@ func (h *WebDAV) handleCopyMove(c *gin.Context) {
 }
 
 // handleGet handles GET requests
-func (h *WebDAV) handleGet(c *gin.Context) {
+func handleGet(c *gin.Context) {
 	// Get authenticated user
 	user, err := getAuthenticatedUser(c)
 	if err != nil {
@@ -287,9 +351,20 @@ func (h *WebDAV) handleGet(c *gin.Context) {
 		return
 	}
 
+	storage, err := getUserStorage(c)
+	if err != nil {
+		return
+	}
+
 	name := c.Param("path")
 
-	info, err := h.storage.GetFileInfo(c, user, name)
+	if err := storage.CheckPermission(c, name, user, stor.PermissionRead); err != nil {
+		log.Printf("Permission denied for %s: %v", name, err)
+		sendError(c, http.StatusForbidden, "Permission denied")
+		return
+	}
+
+	info, err := storage.GetFileInfo(c, name)
 	if err != nil {
 		if os.IsNotExist(err) {
 			sendError(c, http.StatusNotFound, "File not found")
@@ -307,7 +382,7 @@ func (h *WebDAV) handleGet(c *gin.Context) {
 	c.Header("Content-Type", info.ContentType)
 	c.Header("Content-Length", fmt.Sprintf("%d", info.Size))
 
-	file, err := h.storage.OpenFile(c, user, name)
+	file, err := storage.OpenFile(c, name)
 	if err != nil {
 		sendError(c, http.StatusInternalServerError, "Error opening file: %v", err)
 		return

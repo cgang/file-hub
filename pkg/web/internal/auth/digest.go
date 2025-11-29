@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/cgang/file-hub/pkg/users"
+	"github.com/gin-gonic/gin"
 )
 
 // DigestChallenge represents a digest authentication challenge
@@ -24,17 +24,17 @@ type DigestChallenge struct {
 
 // DigestResponse represents a digest authentication response
 type DigestResponse struct {
-	Username   string
-	Realm      string
-	Nonce      string
-	URI        string
-	QoP        string
-	NC         string
-	CNonce     string
-	Response   string
-	Opaque     string
-	Algorithm  string
-	Method     string
+	Username  string
+	Realm     string
+	Nonce     string
+	URI       string
+	QoP       string
+	NC        string
+	CNonce    string
+	Response  string
+	Opaque    string
+	Algorithm string
+	Method    string
 }
 
 // generateNonce creates a random nonce for digest authentication
@@ -164,16 +164,10 @@ func generateWWWAuthenticateHeader(challenge *DigestChallenge) string {
 }
 
 // handleDigestAuth handles digest authentication
-func handleDigestAuth(c *gin.Context, authStr string, userService *users.Service, nonceStore *NonceStore, realm string) {
+func handleDigestAuth(c *gin.Context, authStr string, nonceStore *NonceStore, realm string) {
 	digest, err := parseDigestAuth(authStr)
 	if err != nil {
 		c.String(http.StatusBadRequest, "Invalid digest authorization format")
-		c.Abort()
-		return
-	}
-
-	if userService == nil {
-		c.String(http.StatusInternalServerError, "User service not initialized")
 		c.Abort()
 		return
 	}
@@ -186,9 +180,8 @@ func handleDigestAuth(c *gin.Context, authStr string, userService *users.Service
 	}
 
 	// Validate the digest credentials using the user service
-	user, err := userService.ValidateDigest(
+	user, err := users.ValidateDigest(c,
 		digest.Username,
-		digest.Realm,
 		digest.URI,
 		digest.Nonce,
 		digest.NC,

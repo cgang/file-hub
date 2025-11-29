@@ -12,16 +12,16 @@ import (
 // In a real scenario, you'd want to use an in-memory database or proper mocks.
 
 func TestCalculateHA1(t *testing.T) {
-	ha1 := calculateHA1("testuser", "test", "password")
+	ha1 := calculateHA1("testuser", "password")
 	assert.NotEmpty(t, ha1)
 	assert.Len(t, ha1, 32) // MD5 produces 32 character hex string
 
 	// Same inputs should produce same output
-	ha1Again := calculateHA1("testuser", "test", "password")
+	ha1Again := calculateHA1("testuser", "password")
 	assert.Equal(t, ha1, ha1Again)
 
 	// Different inputs should produce different output
-	differentHA1 := calculateHA1("testuser", "test", "different")
+	differentHA1 := calculateHA1("testuser", "different")
 	assert.NotEqual(t, ha1, differentHA1)
 }
 

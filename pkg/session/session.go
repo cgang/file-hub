@@ -6,13 +6,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cgang/file-hub/pkg/users"
+	"github.com/cgang/file-hub/pkg/model"
 )
 
 // Session represents a user session
 type Session struct {
 	ID        string
-	User      *users.User
+	User      *model.User
 	CreatedAt time.Time
 	ExpiresAt time.Time
 }
@@ -28,10 +28,10 @@ func NewStore() *Store {
 	store := &Store{
 		sessions: make(map[string]*Session),
 	}
-	
+
 	// Start a goroutine to clean up expired sessions periodically
 	go store.cleanupExpiredSessions()
-	
+
 	return store
 }
 
@@ -46,7 +46,7 @@ func generateSessionID() (string, error) {
 }
 
 // Create creates a new session for a user
-func (s *Store) Create(user *users.User) (*Session, error) {
+func (s *Store) Create(user *model.User) (*Session, error) {
 	sessionID, err := generateSessionID()
 	if err != nil {
 		return nil, err

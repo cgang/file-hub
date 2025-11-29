@@ -6,6 +6,8 @@ web:
 database:
   uri: "postgresql://filehub:filehub@localhost:5432/filehub"
 
+realm: "file-hub"
+
 # AWS S3 configuration (optional)
 # Uncomment and configure the following section to enable S3 storage
 #s3:

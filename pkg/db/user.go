@@ -5,28 +5,45 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/cgang/file-hub/pkg/model"
+	"github.com/uptrace/bun"
 )
 
+// UserModel represents a user in the system
+type UserModel struct {
+	bun.BaseModel `bun:"table:users"`
+	*model.User   `bun:",inherit"`
+}
+
+func wrapUser(mu *model.User) *UserModel {
+	return &UserModel{User: mu}
+}
+
+func newUserModel(id int) *UserModel {
+	return &UserModel{User: &model.User{ID: id}}
+}
+
 // CreateUser creates a new user in the database
-func (d *DB) CreateUser(user *User) error {
+func CreateUser(ctx context.Context, user *model.User) error {
 	// Set creation timestamp
 	user.CreatedAt = time.Now()
 	user.UpdatedAt = user.CreatedAt
 
-	_, err := d.NewInsert().Model(user).Exec(context.Background())
+	_, err := db.NewInsert().Model(wrapUser(user)).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
 
 	// Initialize user quota
-	quota := &UserQuota{
+	quota := &model.UserQuota{
 		UserID:          user.ID,
 		TotalQuotaBytes: 10737418240, // 10GB default
 		UsedBytes:       0,
 		UpdatedAt:       time.Now(),
 	}
 
-	_, err = d.NewInsert().Model(quota).Exec(context.Background())
+	_, err = db.NewInsert().Model(wrapQuota(quota)).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize user quota: %w", err)
 	}
@@ -35,12 +52,12 @@ func (d *DB) CreateUser(user *User) error {
 }
 
 // GetUserByID retrieves a user by ID
-func (d *DB) GetUserByID(id int) (*User, error) {
-	user := &User{ID: id}
-	err := d.NewSelect().
+func GetUserByID(ctx context.Context, id int) (*model.User, error) {
+	user := newUserModel(id)
+	err := db.NewSelect().
 		Model(user).
 		Where("id = ? AND is_active = ?", id, true).
-		Scan(context.Background())
+		Scan(ctx)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -49,16 +66,16 @@ func (d *DB) GetUserByID(id int) (*User, error) {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
-	return user, nil
+	return user.User, nil
 }
 
 // GetUserByUsername retrieves a user by username
-func (d *DB) GetUserByUsername(username string) (*User, error) {
-	user := &User{}
-	err := d.NewSelect().
+func GetUserByUsername(ctx context.Context, username string) (*model.User, error) {
+	user := &UserModel{}
+	err := db.NewSelect().
 		Model(user).
 		Where("username = ? AND is_active = ?", username, true).
-		Scan(context.Background())
+		Scan(ctx)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -67,16 +84,16 @@ func (d *DB) GetUserByUsername(username string) (*User, error) {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
-	return user, nil
+	return user.User, nil
 }
 
 // GetUserByEmail retrieves a user by email
-func (d *DB) GetUserByEmail(email string) (*User, error) {
-	user := &User{}
-	err := d.NewSelect().
+func GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
+	user := &UserModel{}
+	err := db.NewSelect().
 		Model(user).
 		Where("email = ? AND is_active = ?", email, true).
-		Scan(context.Background())
+		Scan(ctx)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -85,7 +102,15 @@ func (d *DB) GetUserByEmail(email string) (*User, error) {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
-	return user, nil
+	return user.User, nil
+}
+
+func CountUsers(ctx context.Context) (int, error) {
+	count, err := db.NewSelect().Model((*UserModel)(nil)).Count(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count users: %w", err)
+	}
+	return count, nil
 }
 
 // UserUpdate contains fields that can be updated for a user
@@ -98,11 +123,11 @@ type UserUpdate struct {
 }
 
 // UpdateUser updates a user in the database
-func (d *DB) UpdateUser(id int, update *UserUpdate) error {
-	user := &User{ID: id}
+func UpdateUser(ctx context.Context, id int, update *UserUpdate) error {
+	user := newUserModel(id)
 
 	// Get the existing user first
-	err := d.NewSelect().Model(user).Where("id = ?", id).Scan(context.Background())
+	err := db.NewSelect().Model(user).Where("id = ?", id).Scan(ctx)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return fmt.Errorf("user not found")
@@ -129,7 +154,7 @@ func (d *DB) UpdateUser(id int, update *UserUpdate) error {
 
 	user.UpdatedAt = time.Now()
 
-	result, err := d.NewUpdate().Model(user).Where("id = ?", id).Exec(context.Background())
+	result, err := db.NewUpdate().Model(user).Where("id = ?", id).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to update user: %w", err)
 	}
@@ -147,10 +172,9 @@ func (d *DB) UpdateUser(id int, update *UserUpdate) error {
 }
 
 // DeleteUser marks a user as inactive (soft delete)
-func (d *DB) DeleteUser(id int) error {
-	user := &User{ID: id, IsActive: false, UpdatedAt: time.Now()}
-	result, err := d.NewUpdate().Model(user).Where("id = ?", id).Exec(context.Background())
-
+func DeleteUser(ctx context.Context, id int) error {
+	user := &model.User{ID: id, IsActive: false, UpdatedAt: time.Now()}
+	result, err := db.NewUpdate().Model(wrapUser(user)).Where("id = ?", id).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
@@ -168,10 +192,9 @@ func (d *DB) DeleteUser(id int) error {
 }
 
 // UpdateUserHA1 updates a user's HA1 hash and realm
-func (d *DB) UpdateUserHA1(id int, ha1, realm string) error {
-	user := &User{ID: id, HA1: ha1, Realm: realm, UpdatedAt: time.Now()}
-	result, err := d.NewUpdate().Model(user).Where("id = ?", id).Exec(context.Background())
-
+func UpdateUserHA1(ctx context.Context, id int, ha1 string) error {
+	user := &model.User{ID: id, HA1: ha1, UpdatedAt: time.Now()}
+	result, err := db.NewUpdate().Model(wrapUser(user)).Where("id = ?", id).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to update user HA1: %w", err)
 	}

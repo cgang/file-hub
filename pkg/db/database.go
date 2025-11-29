@@ -3,53 +3,48 @@ package db
 import (
 	"context"
 	"database/sql"
-	"fmt"
+	"log"
 
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
 )
 
-// DB provides database access methods
-type DB struct {
-	*bun.DB
-}
+// ErrNoRows is returned when a query returns no rows
+var ErrNoRows = sql.ErrNoRows
 
-// New creates a new database connection
-func New(connStr string) (*DB, error) {
-	// Create a sql.DB connection using pgdriver
-	pgdb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(connStr)))
+var db *bun.DB
 
-	// Create a Bun DB instance
-	db := bun.NewDB(pgdb, pgdialect.New())
-
-	return &DB{db}, nil
-}
-
-// Close closes the database connection
-func (d *DB) Close() error {
-	return d.DB.Close()
-}
-
-// IsDatabaseEmpty checks if the database is empty (no users exist)
-func (d *DB) IsDatabaseEmpty() (bool, error) {
-	count, err := d.NewSelect().Model((*User)(nil)).Count(context.Background())
-	if err != nil {
-		return false, fmt.Errorf("failed to count users: %w", err)
+func Init(ctx context.Context, dsn string) {
+	pgdb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
+	if err := pgdb.PingContext(ctx); err != nil {
+		log.Panicf("Ping database failed: %s", err)
 	}
-	return count == 0, nil
+
+	db = bun.NewDB(pgdb, pgdialect.New())
+	if err := initDB(ctx); err != nil {
+		log.Panicf("Initialize database failed: %s", err)
+	}
 }
 
-// InitDB initializes the database with required tables
-func (d *DB) InitDB() error {
-	models := []interface{}{
-		(*User)(nil),
-		(*File)(nil),
-		(*UserQuota)(nil),
+func Close() error {
+	if db == nil {
+		return nil
+	}
+
+	return db.Close()
+}
+
+// initDB initializes the database with required tables
+func initDB(ctx context.Context) error {
+	models := []any{
+		(*UserModel)(nil),
+		(*FileModel)(nil),
+		(*UserQuotaModel)(nil),
 	}
 
 	for _, model := range models {
-		_, err := d.NewCreateTable().Model(model).IfNotExists().Exec(context.Background())
+		_, err := db.NewCreateTable().Model(model).IfNotExists().Exec(ctx)
 		if err != nil {
 			return err
 		}
@@ -60,14 +55,14 @@ func (d *DB) InitDB() error {
 		`CREATE INDEX IF NOT EXISTS idx_files_user_id ON files (user_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_files_path ON files (path);`,
 	} {
-		_, err := d.ExecContext(context.Background(), query)
+		_, err := db.ExecContext(ctx, query)
 		if err != nil {
 			return err
 		}
 	}
 
 	// Set up the trigger function for automatic quota management
-	_, err := d.ExecContext(context.Background(), `
+	_, err := db.ExecContext(ctx, `
 		CREATE OR REPLACE FUNCTION update_user_quota()
 		RETURNS TRIGGER AS $$
 		DECLARE
@@ -105,7 +100,7 @@ func (d *DB) InitDB() error {
 	}
 
 	// Create the trigger if it doesn't exist
-	_, err = d.ExecContext(context.Background(), `
+	_, err = db.ExecContext(ctx, `
 		DO $$
 		BEGIN
 			IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'user_quota_trigger') THEN
@@ -115,9 +110,5 @@ func (d *DB) InitDB() error {
 			END IF;
 		END$$;
 	`)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }

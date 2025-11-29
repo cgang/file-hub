@@ -4,13 +4,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gin-gonic/gin"
+	"github.com/cgang/file-hub/pkg/model"
 	"github.com/cgang/file-hub/pkg/session"
-	"github.com/cgang/file-hub/pkg/users"
+	"github.com/gin-gonic/gin"
 )
-
-// UserService is the user service instance used for authentication
-var UserService *users.Service
 
 // SessionStore is the session store instance
 var SessionStore *session.Store
@@ -21,11 +18,6 @@ const SessionCookieName = "filehub_session"
 
 // NonceStore stores nonces for digest authentication
 var nonceStore = NewNonceStore()
-
-// SetUserService sets the user service instance for authentication
-func SetUserService(service *users.Service) {
-	UserService = service
-}
 
 // SetSessionStore sets the session store instance
 func SetSessionStore(store *session.Store) {
@@ -73,9 +65,9 @@ func Authenticate(c *gin.Context) {
 
 	switch kind {
 	case "Basic":
-		handleBasicAuth(c, creds, UserService, Realm)
+		handleBasicAuth(c, creds, Realm)
 	case "Digest":
-		handleDigestAuth(c, authStr, UserService, nonceStore, Realm)
+		handleDigestAuth(c, authStr, nonceStore, Realm)
 	default:
 		c.String(http.StatusBadRequest, "Unsupported authorization method")
 		c.Abort()
@@ -84,18 +76,18 @@ func Authenticate(c *gin.Context) {
 }
 
 // GetAuthenticatedUser retrieves the authenticated user from the context
-func GetAuthenticatedUser(c *gin.Context) (*users.User, bool) {
+func GetAuthenticatedUser(c *gin.Context) (*model.User, bool) {
 	user, exists := c.Get("user")
 	if !exists {
 		return nil, false
 	}
 
-	u, ok := user.(*users.User)
+	u, ok := user.(*model.User)
 	return u, ok
 }
 
 // CreateSession creates a new session for the user and sets a cookie
-func CreateSession(c *gin.Context, user *users.User) error {
+func CreateSession(c *gin.Context, user *model.User) error {
 	if SessionStore == nil {
 		return nil // Sessions not enabled
 	}

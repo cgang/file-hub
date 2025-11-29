@@ -5,15 +5,31 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/cgang/file-hub/pkg/model"
+	"github.com/uptrace/bun"
 )
 
+// FileModel represents a file object for database operations
+type FileModel struct {
+	bun.BaseModel     `bun:"table:files"`
+	*model.FileObject `bun:",inherit"`
+}
+
+func wrapFile(mo *model.FileObject) *FileModel {
+	return &FileModel{FileObject: mo}
+}
+func newFile(id int) *FileModel {
+	return &FileModel{FileObject: &model.FileObject{ID: id}}
+}
+
 // CreateFile creates a new file record in the database
-func (d *DB) CreateFile(file *File) error {
+func CreateFile(ctx context.Context, file *model.FileObject) error {
 	// Set creation timestamp
 	file.CreatedAt = time.Now()
 	file.UpdatedAt = file.CreatedAt
 
-	_, err := d.NewInsert().Model(file).Exec(context.Background())
+	_, err := db.NewInsert().Model(wrapFile(file)).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
@@ -22,12 +38,12 @@ func (d *DB) CreateFile(file *File) error {
 }
 
 // GetFileByID retrieves a file by ID
-func (d *DB) GetFileByID(id int) (*File, error) {
-	file := &File{ID: id}
-	err := d.NewSelect().
+func GetFileByID(ctx context.Context, id int) (*model.FileObject, error) {
+	file := newFile(id)
+	err := db.NewSelect().
 		Model(file).
 		Where("id = ? AND is_deleted = ?", id, false).
-		Scan(context.Background())
+		Scan(ctx)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -36,16 +52,16 @@ func (d *DB) GetFileByID(id int) (*File, error) {
 		return nil, fmt.Errorf("failed to get file: %w", err)
 	}
 
-	return file, nil
+	return file.FileObject, nil
 }
 
 // GetFileByPath retrieves a file by its path
-func (d *DB) GetFileByPath(path string, userID int) (*File, error) {
-	file := &File{}
-	err := d.NewSelect().
+func GetFileByPath(ctx context.Context, path string, userID int) (*model.FileObject, error) {
+	file := newFile(0)
+	err := db.NewSelect().
 		Model(file).
 		Where("path = ? AND user_id = ? AND is_deleted = ?", path, userID, false).
-		Scan(context.Background())
+		Scan(ctx)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -54,17 +70,17 @@ func (d *DB) GetFileByPath(path string, userID int) (*File, error) {
 		return nil, fmt.Errorf("failed to get file: %w", err)
 	}
 
-	return file, nil
+	return file.FileObject, nil
 }
 
 // GetFilesByUser retrieves all files for a specific user
-func (d *DB) GetFilesByUser(userID int) ([]*File, error) {
-	var files []*File
-	err := d.NewSelect().
+func GetFilesByUser(ctx context.Context, userID int) ([]*FileModel, error) {
+	var files []*FileModel
+	err := db.NewSelect().
 		Model(&files).
 		Where("user_id = ? AND is_deleted = ?", userID, false).
 		Order("updated_at DESC").
-		Scan(context.Background())
+		Scan(ctx)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get files: %w", err)
@@ -74,25 +90,30 @@ func (d *DB) GetFilesByUser(userID int) ([]*File, error) {
 }
 
 // GetFilesByUserAndPathPrefix retrieves files under a specific path for a user
-func (d *DB) GetFilesByUserAndPathPrefix(userID int, pathPrefix string) ([]*File, error) {
+func GetFilesByUserAndPathPrefix(ctx context.Context, userID int, pathPrefix string) ([]*model.FileObject, error) {
 	// Ensure pathPrefix ends with a slash to avoid matching partial directory names
 	// For example, if pathPrefix is "/docs/", we don't want to match "/docs-old/"
 	if pathPrefix != "/" && pathPrefix[len(pathPrefix)-1] != '/' {
 		pathPrefix += "/"
 	}
 
-	var files []*File
-	err := d.NewSelect().
+	var files []*FileModel
+	err := db.NewSelect().
 		Model(&files).
 		Where("user_id = ? AND (path = ? OR path LIKE ?) AND is_deleted = ?", userID, pathPrefix, pathPrefix+"%", false).
 		Order("path").
-		Scan(context.Background())
+		Scan(ctx)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get files: %w", err)
 	}
 
-	return files, nil
+	var results []*model.FileObject
+	for _, f := range files {
+		results = append(results, f.FileObject)
+	}
+
+	return results, nil
 }
 
 // FileUpdate contains fields that can be updated for a file
@@ -106,11 +127,11 @@ type FileUpdate struct {
 }
 
 // UpdateFile updates a file in the database
-func (d *DB) UpdateFile(id int, update *FileUpdate) error {
-	file := &File{ID: id}
+func UpdateFile(ctx context.Context, id int, update *FileUpdate) error {
+	file := newFile(id)
 
 	// Get the existing file first
-	err := d.NewSelect().Model(file).Where("id = ?", id).Scan(context.Background())
+	err := db.NewSelect().Model(file).Where("id = ?", id).Scan(ctx)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return fmt.Errorf("file not found")
@@ -141,7 +162,7 @@ func (d *DB) UpdateFile(id int, update *FileUpdate) error {
 	// Always update updated_at
 	file.UpdatedAt = time.Now()
 
-	result, err := d.NewUpdate().Model(file).Where("id = ?", id).Exec(context.Background())
+	result, err := db.NewUpdate().Model(file).Where("id = ?", id).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to update file: %w", err)
 	}
@@ -158,12 +179,9 @@ func (d *DB) UpdateFile(id int, update *FileUpdate) error {
 	return nil
 }
 
-// DeleteFile marks a file as deleted (soft delete)
-func (d *DB) DeleteFile(id int) error {
-	now := time.Now()
-	file := &File{ID: id, IsDeleted: true, DeletedAt: &now, UpdatedAt: now}
-	result, err := d.NewUpdate().Model(file).Where("id = ?", id).Exec(context.Background())
-
+// DeleteFile deletes a file with the given ID
+func DeleteFile(ctx context.Context, id int) error {
+	result, err := db.NewDelete().Model((*FileModel)(nil)).Where("id = ?", id).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to delete file: %w", err)
 	}
@@ -181,13 +199,11 @@ func (d *DB) DeleteFile(id int) error {
 }
 
 // DeleteFileByPath marks a file as deleted by path and user
-func (d *DB) DeleteFileByPath(path string, userID int) error {
-	now := time.Now()
-	file := &File{IsDeleted: true, DeletedAt: &now, UpdatedAt: now}
-	result, err := d.NewUpdate().
-		Model(file).
+func DeleteFileByPath(ctx context.Context, path string, userID int) error {
+	result, err := db.NewDelete().
+		Model((*FileModel)(nil)).
 		Where("path = ? AND user_id = ?", path, userID).
-		Exec(context.Background())
+		Exec(ctx)
 
 	if err != nil {
 		return fmt.Errorf("failed to delete file: %w", err)

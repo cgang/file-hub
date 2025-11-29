@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cgang/file-hub/pkg/users"
+	"github.com/cgang/file-hub/pkg/model"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,7 +13,7 @@ func TestSessionStore(t *testing.T) {
 	store := NewStore()
 
 	// Create a test user
-	user := &users.User{
+	user := &model.User{
 		ID:       1,
 		Username: "testuser",
 		Email:    "test@example.com",
@@ -47,7 +47,7 @@ func TestSessionExpiration(t *testing.T) {
 	store := NewStore()
 
 	// Create a test user
-	user := &users.User{
+	user := &model.User{
 		ID:       1,
 		Username: "testuser",
 		Email:    "test@example.com",

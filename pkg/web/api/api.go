@@ -10,7 +10,12 @@ import (
 
 // SetupMiddleware allows access to setup routes only when database is empty
 func SetupMiddleware(c *gin.Context) {
-	if users.HasAnyUser() {
+	if ok, err := users.HasAnyUser(c.Request.Context()); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check user existence"})
+		c.Abort()
+		return
+	} else if ok {
+		// Database is not empty, redirect to main UI
 		c.Redirect(http.StatusFound, "/ui/")
 		c.Abort()
 		return
@@ -44,7 +49,7 @@ func Register(r *gin.RouterGroup) {
 
 func SetupPageHTMLHandler(c *gin.Context) {
 	// Check if database is empty, if not redirect to login
-	if users.HasAnyUser() {
+	if ok, err := users.HasAnyUser(c.Request.Context()); err != nil || ok {
 		c.Redirect(http.StatusFound, "/ui/")
 		return
 	}
@@ -433,7 +438,7 @@ func SetupPageHandler(c *gin.Context) {
 // SetupHandler handles the creation of the first user
 func SetupHandler(c *gin.Context) {
 	// Check if database is empty, if not reject the request
-	if users.HasAnyUser() {
+	if ok, err := users.HasAnyUser(c.Request.Context()); err != nil || ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Setup already completed"})
 		return
 	}
@@ -449,12 +454,6 @@ func SetupHandler(c *gin.Context) {
 		return
 	}
 
-	// Create the first user with admin privileges
-	if auth.UserService == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "User service not initialized"})
-		return
-	}
-
 	// Create user request with admin privileges
 	userReq := &users.CreateUserRequest{
 		Username: req.Username,
@@ -464,7 +463,7 @@ func SetupHandler(c *gin.Context) {
 	}
 
 	// Save the user to the database
-	user, err := auth.UserService.CreateFirstUser(userReq)
+	user, err := users.CreateFirstUser(c, userReq)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user: " + err.Error()})
 		return

@@ -10,7 +10,10 @@ import (
 // LoginHandler handles user login requests
 func LoginHandler(c *gin.Context) {
 	// Check if database is empty, redirect to setup page if it is
-	if !users.HasAnyUser() {
+	if yes, err := users.HasAnyUser(c); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check user existence"})
+		return
+	} else if !yes {
 		c.JSON(http.StatusFound, gin.H{"redirect": "/setup"})
 		return
 	}
@@ -25,12 +28,7 @@ func LoginHandler(c *gin.Context) {
 		return
 	}
 
-	if UserService == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "User service not initialized"})
-		return
-	}
-
-	user, err := UserService.Authenticate(req.Username, req.Password)
+	user, err := users.Authenticate(c, req.Username, req.Password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
 		return

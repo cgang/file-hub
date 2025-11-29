@@ -7,17 +7,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cgang/file-hub/pkg/users"
+	"github.com/cgang/file-hub/pkg/model"
 )
 
 // mockUserService creates a mock user service for testing
-func mockUserService() *users.Service {
+func mockUserService() interface{} {
 	return nil // We won't actually use the service in these tests
 }
 
 // mockUser creates a mock user for testing
-func mockUser(homeDir string) *users.User {
-	return &users.User{
+func mockUser(homeDir string) *model.User {
+	return &model.User{
 		ID:        1,
 		Username:  "testuser",
 		Email:     "test@example.com",
@@ -35,25 +35,23 @@ func stringPtr(s string) *string {
 	return &s
 }
 
-func setupTest(t *testing.T) (Storage, *users.User, string) {
+func setupTest(t *testing.T) (*OsStorage, string) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 
-	// Create storage with mock service
-	storage := NewStorage(mockUserService())
-
-	// Create mock user with temp directory as home dir
+	// Create storage with mock user
 	user := mockUser(tempDir)
+	storage := newFsStorage(user)
 
-	return storage, user, tempDir
+	return storage, tempDir
 }
 
 func TestOsStorage_CreateFile(t *testing.T) {
-	storage, user, _ := setupTest(t)
+	storage, _ := setupTest(t)
 	filePath := "test.txt"
 
 	// Create a file
-	file, err := storage.CreateFile(context.Background(), user, filePath)
+	file, err := storage.CreateFile(context.Background(), filePath)
 	if err != nil {
 		t.Fatalf("CreateFile failed: %v", err)
 	}
@@ -68,11 +66,11 @@ func TestOsStorage_CreateFile(t *testing.T) {
 }
 
 func TestOsStorage_GetFileInfo(t *testing.T) {
-	storage, user, _ := setupTest(t)
+	storage, _ := setupTest(t)
 	filePath := "test_info.txt"
 
 	// Create a file
-	file, err := storage.CreateFile(context.Background(), user, filePath)
+	file, err := storage.CreateFile(context.Background(), filePath)
 	if err != nil {
 		t.Fatalf("CreateFile failed: %v", err)
 	}
@@ -86,7 +84,7 @@ func TestOsStorage_GetFileInfo(t *testing.T) {
 	}
 
 	// Get file info
-	info, err := storage.GetFileInfo(context.Background(), user, filePath)
+	info, err := storage.GetFileInfo(context.Background(), filePath)
 	if err != nil {
 		t.Fatalf("GetFileInfo failed: %v", err)
 	}
@@ -101,23 +99,23 @@ func TestOsStorage_GetFileInfo(t *testing.T) {
 }
 
 func TestOsStorage_CreateDir(t *testing.T) {
-	storage, user, _ := setupTest(t)
+	storage, _ := setupTest(t)
 	dirPath := "test_dir"
 
 	// Create a directory
-	err := storage.CreateDir(context.Background(), user, dirPath)
+	err := storage.CreateDir(context.Background(), dirPath)
 	if err != nil {
 		t.Fatalf("CreateDir failed: %v", err)
 	}
 }
 
 func TestOsStorage_CopyFile(t *testing.T) {
-	storage, user, tempDir := setupTest(t)
+	storage, tempDir := setupTest(t)
 	srcPath := "source.txt"
 	dstPath := "destination.txt"
 
 	// Create source file with content
-	srcFile, err := storage.CreateFile(context.Background(), user, srcPath)
+	srcFile, err := storage.CreateFile(context.Background(), srcPath)
 	if err != nil {
 		t.Fatalf("CreateFile for source failed: %v", err)
 	}
@@ -129,7 +127,7 @@ func TestOsStorage_CopyFile(t *testing.T) {
 	srcFile.Close()
 
 	// Copy file
-	err = storage.CopyFile(context.Background(), user, srcPath, dstPath)
+	err = storage.CopyFile(context.Background(), srcPath, dstPath)
 	if err != nil {
 		t.Fatalf("CopyFile failed: %v", err)
 	}
@@ -146,12 +144,12 @@ func TestOsStorage_CopyFile(t *testing.T) {
 }
 
 func TestOsStorage_MoveFile(t *testing.T) {
-	storage, user, tempDir := setupTest(t)
+	storage, tempDir := setupTest(t)
 	srcPath := "move_source.txt"
 	dstPath := "move_destination.txt"
 
 	// Create source file with content
-	srcFile, err := storage.CreateFile(context.Background(), user, srcPath)
+	srcFile, err := storage.CreateFile(context.Background(), srcPath)
 	if err != nil {
 		t.Fatalf("CreateFile for source failed: %v", err)
 	}
@@ -163,7 +161,7 @@ func TestOsStorage_MoveFile(t *testing.T) {
 	srcFile.Close()
 
 	// Move file
-	err = storage.MoveFile(context.Background(), user, srcPath, dstPath)
+	err = storage.MoveFile(context.Background(), srcPath, dstPath)
 	if err != nil {
 		t.Fatalf("MoveFile failed: %v", err)
 	}
@@ -180,11 +178,11 @@ func TestOsStorage_MoveFile(t *testing.T) {
 }
 
 func TestOsStorage_DeleteFile(t *testing.T) {
-	storage, user, _ := setupTest(t)
+	storage, _ := setupTest(t)
 	filePath := "delete_test.txt"
 
 	// Create file
-	file, err := storage.CreateFile(context.Background(), user, filePath)
+	file, err := storage.CreateFile(context.Background(), filePath)
 	if err != nil {
 		t.Fatalf("CreateFile failed: %v", err)
 	}
@@ -195,7 +193,7 @@ func TestOsStorage_DeleteFile(t *testing.T) {
 	file.Close()
 
 	// Delete file
-	err = storage.DeleteFile(context.Background(), user, filePath)
+	err = storage.DeleteFile(context.Background(), filePath)
 	if err != nil {
 		t.Fatalf("DeleteFile failed: %v", err)
 	}

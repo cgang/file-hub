@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"log"
+	"os"
+	"os/signal"
 
 	"github.com/cgang/file-hub/pkg/config"
 	"github.com/cgang/file-hub/pkg/db"
-	"github.com/cgang/file-hub/pkg/stor"
 	"github.com/cgang/file-hub/pkg/users"
 	"github.com/cgang/file-hub/pkg/web"
 )
@@ -18,30 +19,23 @@ func main() {
 		log.Panicf("Failed to load config file: %s", err)
 	}
 
-	// Initialize database connection
-	database, err := db.New(cfg.Database.URI)
-	if err != nil {
-		log.Panicf("Failed to connect to database: %s", err)
-	}
-	defer database.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	db.Init(ctx, cfg.Database.URI)
+	users.Init(ctx, cfg.Realm)
 
-	// Initialize database tables
-	if err := database.InitDB(); err != nil {
-		log.Panicf("Failed to initialize database: %s", err)
-	}
+	web.Start(ctx, cfg.Web)
 
-	// Check if users table is empty and set global flag
-	count, err := database.NewSelect().Model((*db.User)(nil)).Count(context.Background())
-	if err != nil {
-		log.Panicf("Failed to count users: %s", err)
-	}
-	users.SetHasAnyUser(count > 0)
+	// wait for unix signal to exit
+	// wait for termination signal
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt, os.Kill)
 
-	// Initialize user service
-	userService := users.NewService(database)
+	sig := <-sigs
+	log.Printf("Received signal %s, shutting down...", sig)
 
-	log.Println("Initializing WebDAV server...")
-	storage := stor.NewStorage(userService)
+	web.Stop(ctx)
 
-	web.Start(cfg.Web, storage, userService)
+	cancel()
+
+	// TODO wait for ongoing operations to finish
 }

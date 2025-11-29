@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/cgang/file-hub/pkg/model"
 	"github.com/cgang/file-hub/pkg/session"
-	"github.com/cgang/file-hub/pkg/users"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
@@ -26,7 +26,7 @@ func TestSessionMiddleware(t *testing.T) {
 	SessionStore = sessionStore
 
 	// Create a test user
-	user := &users.User{
+	user := &model.User{
 		ID:       1,
 		Username: "testuser",
 		Email:    "test@example.com",
@@ -75,7 +75,7 @@ func TestLogoutHandler(t *testing.T) {
 	SessionStore = sessionStore
 
 	// Create a test user
-	user := &users.User{
+	user := &model.User{
 		ID:       1,
 		Username: "testuser",
 		Email:    "test@example.com",
