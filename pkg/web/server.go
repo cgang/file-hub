@@ -8,7 +8,6 @@ import (
 
 	"github.com/cgang/file-hub/pkg/config"
 	"github.com/cgang/file-hub/pkg/session"
-	"github.com/cgang/file-hub/pkg/users"
 	"github.com/cgang/file-hub/pkg/web/api"
 	"github.com/cgang/file-hub/pkg/web/internal/auth"
 	"github.com/cgang/file-hub/pkg/webdav"
@@ -31,16 +30,6 @@ func Start(ctx context.Context, cfg config.WebConfig) {
 	}
 
 	engine := gin.Default()
-
-	// Add a route for the setup page
-	engine.GET("/setup", func(c *gin.Context) {
-		// Check if database is empty to determine if we should show setup page
-		if ok, err := users.HasAnyUser(context.Background()); err != nil || !ok {
-			c.Redirect(http.StatusFound, "/ui/setup")
-			return
-		}
-		c.Redirect(http.StatusFound, "/ui/")
-	})
 
 	if cfg.Metrics {
 		// Register Prometheus metrics endpoint

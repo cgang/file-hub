@@ -71,6 +71,7 @@ When reviewing AI-generated code, pay special attention to:
 - Configuration uses YAML files with environment variable override
 - Authentication uses HTTP Basic Auth with database storage
 - Makefile orchestrates both frontend and backend builds
+- All frontend code must be kept under the `/web/` directory and based on Svelte
 
 ## AI Context Reminders
 
