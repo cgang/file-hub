@@ -4,25 +4,10 @@ import (
 	"context"
 	"errors"
 	"io"
-	"sync"
 
-	"github.com/cgang/file-hub/pkg/config"
 	"github.com/cgang/file-hub/pkg/db"
 	"github.com/cgang/file-hub/pkg/model"
 )
-
-// Global config variable
-var (
-	globalConfig *config.Config
-	configOnce   sync.Once
-)
-
-// InitConfig initializes the global config
-func InitConfig(cfg *config.Config) {
-	configOnce.Do(func() {
-		globalConfig = cfg
-	})
-}
 
 func GetFileInfo(ctx context.Context, resource *model.Resource) (*model.FileObject, error) {
 	return db.GetFile(ctx, resource.ReposID, resource.Path)

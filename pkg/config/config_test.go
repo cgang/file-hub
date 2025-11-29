@@ -45,7 +45,7 @@ database:
 }
 
 func TestGetDefaultConfig(t *testing.T) {
-	cfg := GetDefaultConfig()
+	cfg := newDefaultConfig()
 	assert.NotNil(t, cfg)
 	assert.Equal(t, 8080, cfg.Web.Port)
 	assert.Equal(t, "postgresql://filehub:filehub@localhost:5432/filehub", cfg.Database.URI)

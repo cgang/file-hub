@@ -63,7 +63,7 @@ func getConfigDirs() ([]string, error) {
 }
 
 // LoadConfig loads configuration from a YAML file
-func LoadConfig(filename string) (*Config, error) {
+func LoadConfig(name string) (*Config, error) {
 	// Get the list of directories to search for config files
 	searchPaths, err := getConfigDirs()
 	if err != nil {
@@ -71,10 +71,10 @@ func LoadConfig(filename string) (*Config, error) {
 	}
 	// Search for config.yaml in each directory from getConfigDirs
 	for _, searchDir := range searchPaths {
-		configFile := filepath.Join(searchDir, "config.yaml")
-		var config Config
-		if err = loadYamlFile(configFile, &config); err == nil {
-			return &config, nil
+		configFile := filepath.Join(searchDir, name)
+		config := newDefaultConfig()
+		if err = loadYamlFile(configFile, config); err == nil {
+			return config, nil
 		} else if os.IsNotExist(err) {
 			continue // Try next directory
 		} else {
@@ -107,8 +107,8 @@ func (c *Config) SaveConfig(filename string) error {
 	return os.WriteFile(filename, data, 0644)
 }
 
-// GetDefaultConfig returns a configuration with default values
-func GetDefaultConfig() *Config {
+// newDefaultConfig returns a configuration with default values
+func newDefaultConfig() *Config {
 	return &Config{
 		Web: WebConfig{
 			Port: 8080,
