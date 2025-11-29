@@ -10,7 +10,7 @@ import (
 )
 
 func GetFileInfo(ctx context.Context, resource *model.Resource) (*model.FileObject, error) {
-	return db.GetFile(ctx, resource.ReposID, resource.Path)
+	return db.GetFile(ctx, resource.Repo.ID, resource.Path)
 }
 
 func ListDir(ctx context.Context, parent *model.FileObject) ([]*model.FileObject, error) {

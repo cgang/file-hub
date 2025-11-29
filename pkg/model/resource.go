@@ -1,12 +1,11 @@
 package model
 
+// Resource represents a file or directory within a repository
 type Resource struct {
-	ReposName string
-	ReposID   int
-	OwnerID   int
-	Path      string
+	Repo *Repository
+	Path string
 }
 
 func (r *Resource) String() string {
-	return r.ReposName + "/" + r.Path
+	return r.Repo.Name + "/" + r.Path
 }

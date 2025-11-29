@@ -18,7 +18,7 @@ const (
 )
 
 func CheckPermission(ctx context.Context, userID int, resource *model.Resource, perm Permission) error {
-	if userID == resource.OwnerID {
+	if userID == resource.Repo.OwnerID {
 		return nil // Owner has all permissions
 	}
 

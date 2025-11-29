@@ -47,7 +47,7 @@ func GetShareByID(ctx context.Context, id int) (*model.Share, error) {
 
 func GetShareForObject(ctx context.Context, userID int, res *model.Resource) (*model.Share, error) {
 	var mos []*ShareModel
-	err := db.NewSelect().Model(&mos).Where("user_id = ? AND repos_id = ?", userID, res.ReposID).Scan(ctx)
+	err := db.NewSelect().Model(&mos).Where("user_id = ? AND repos_id = ?", userID, res.Repo.ID).Scan(ctx)
 	if err != nil {
 		return nil, err
 	}

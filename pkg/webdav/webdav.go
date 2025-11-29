@@ -1,12 +1,14 @@
 package webdav
 
 import (
+	"context"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -95,17 +97,37 @@ func sendError(c *gin.Context, status int, format string, a ...any) {
 
 func getResource(c *gin.Context) (*model.Resource, error) {
 	name := c.Param("repos")
-	repos, err := stor.GetRepository(c, name)
+	repo, err := stor.GetRepository(c, name)
 	if err != nil {
 		sendError(c, http.StatusBadRequest, "Repository not found")
 		return nil, fmt.Errorf("get repository %s failed: %w", name, err)
 	}
 
 	return &model.Resource{
-		ReposID: repos.ID,
-		OwnerID: repos.OwnerID,
-		Path:    strings.TrimPrefix(c.Param("path"), "/"),
+		Repo: repo,
+		Path: strings.TrimPrefix(c.Param("path"), "/"),
 	}, nil
+}
+
+// getResourceByUrl parses a URL and returns the corresponding Resource
+func getResourceByUrl(ctx context.Context, urlStr string) (*model.Resource, error) {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid URL: %w", err)
+	}
+
+	// TODO fix hardcoded /dav path
+	subPath := strings.TrimPrefix(u.Path, "/dav")
+	if base, name, ok := strings.Cut(subPath, "/"); ok {
+		r, err := stor.GetRepository(ctx, base)
+		if err != nil {
+			return nil, err
+		}
+
+		return &model.Resource{Repo: r, Path: name}, nil
+	} else {
+		return nil, fmt.Errorf("invalid path: %s", subPath)
+	}
 }
 
 // handlePropfind handles PROPFIND requests
@@ -286,27 +308,12 @@ func handleCopyMove(c *gin.Context) {
 		return
 	}
 
-	destination := c.Request.Header.Get("Destination")
-	if destination == "" || !strings.HasPrefix(destination, "/dav") { // TODO fix hardcoded path
-		sendError(c, http.StatusBadRequest, "Destination header required")
-		return
-	}
-
 	// Parse destination path
-	var destResource *model.Resource
-	destPath := strings.TrimPrefix(destination, "/dav")
-	if repos, name, ok := strings.Cut(destPath, "/"); ok {
-		r, err := stor.GetRepository(c, repos)
-		if err != nil {
-			sendError(c, http.StatusBadRequest, "Destination repository not found")
-			return
-		}
-
-		destResource = &model.Resource{
-			ReposID: r.ID, // TODO lookup repository ID
-			OwnerID: user.ID,
-			Path:    name,
-		}
+	destination := c.Request.Header.Get("Destination")
+	destRes, err := getResourceByUrl(c, destination)
+	if err != nil {
+		sendError(c, http.StatusBadRequest, "Invalid destination: %s", err)
+		return
 	}
 
 	if err := stor.CheckPermission(c, user.ID, resource, stor.PermissionRead); err != nil {
@@ -314,7 +321,7 @@ func handleCopyMove(c *gin.Context) {
 		return
 	}
 
-	if err := stor.CheckPermission(c, user.ID, destResource, stor.PermissionWrite); err != nil {
+	if err := stor.CheckPermission(c, user.ID, destRes, stor.PermissionWrite); err != nil {
 		sendError(c, http.StatusForbidden, "Permission denied for destination")
 		return
 	}
@@ -322,13 +329,13 @@ func handleCopyMove(c *gin.Context) {
 	// Handle COPY or MOVE
 	if c.Request.Method == "COPY" {
 		// Copy file/directory using storage
-		if err := stor.CopyFile(c, resource, destResource); err != nil {
+		if err := stor.CopyFile(c, resource, destRes); err != nil {
 			sendError(c, http.StatusInternalServerError, "Failed to copy file: %v", err)
 			return
 		}
 	} else {
 		// Move file/directory using storage
-		if err := stor.MoveFile(c, resource, destResource); err != nil {
+		if err := stor.MoveFile(c, resource, destRes); err != nil {
 			sendError(c, http.StatusInternalServerError, "Failed to move file: %v", err)
 			return
 		}
