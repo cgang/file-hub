@@ -7,9 +7,9 @@ CREATE TABLE users (
     username VARCHAR(255) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     ha1_hash VARCHAR(255) NOT NULL,  -- Store HA1 hash for digest auth (username:realm:password)
-    realm VARCHAR(255) NOT NULL,     -- Realm used for HA1 calculation
     first_name VARCHAR(255),
     last_name VARCHAR(255),
+    home_dir VARCHAR(255) NOT NULL,  -- Home directory path for the user
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     last_login TIMESTAMP WITH TIME ZONE,
