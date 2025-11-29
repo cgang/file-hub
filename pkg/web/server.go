@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/cgang/file-hub/pkg/config"
-	"github.com/cgang/file-hub/pkg/db"
 	"github.com/cgang/file-hub/pkg/session"
 	"github.com/cgang/file-hub/pkg/stor"
 	"github.com/cgang/file-hub/pkg/users"
@@ -14,10 +13,12 @@ import (
 	"github.com/cgang/file-hub/pkg/web/internal/auth"
 	"github.com/cgang/file-hub/pkg/webdav"
 	"github.com/cgang/file-hub/web"
+	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-func Start(cfg config.WebConfig, storage stor.Storage, userService *users.Service, database *db.DB) {
+func Start(cfg config.WebConfig, storage stor.Storage, userService *users.Service) {
 	// Set the user service for authentication
 	auth.SetUserService(userService)
 
@@ -39,11 +40,21 @@ func Start(cfg config.WebConfig, storage stor.Storage, userService *users.Servic
 	engine.GET("/setup", func(c *gin.Context) {
 		// Check if database is empty to determine if we should show setup page
 		if !users.HasAnyUser() {
-			c.Redirect(http.StatusFound, "/api/setup")
+			c.Redirect(http.StatusFound, "/ui/setup")
 			return
 		}
 		c.Redirect(http.StatusFound, "/ui/")
 	})
+
+	if cfg.Metrics {
+		// Register Prometheus metrics endpoint
+		engine.Handle(http.MethodGet, "/metrics", gin.WrapH(promhttp.Handler()))
+	}
+
+	if cfg.Debug {
+		gin.SetMode(gin.DebugMode)
+		pprof.Register(engine)
+	}
 
 	api.Register(engine.Group("/api"))
 

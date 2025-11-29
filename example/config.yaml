@@ -1,5 +1,7 @@
 web:
   port: 8080
+  metrics: true
+  debug: true
 
 database:
   uri: "postgresql://filehub:filehub@localhost:5432/filehub"

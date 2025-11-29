@@ -11,7 +11,9 @@ import (
 
 // WebConfig holds the WebDAV server configuration
 type WebConfig struct {
-	Port int `yaml:"port"`
+	Port    int  `yaml:"port"`
+	Metrics bool `yaml:"metrics,omitempty"`
+	Debug   bool `yaml:"debug,omitempty"`
 }
 
 // DatabaseConfig holds the database configuration

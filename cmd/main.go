@@ -43,5 +43,5 @@ func main() {
 	log.Println("Initializing WebDAV server...")
 	storage := stor.NewStorage(userService)
 
-	web.Start(cfg.Web, storage, userService, database)
+	web.Start(cfg.Web, storage, userService)
 }
