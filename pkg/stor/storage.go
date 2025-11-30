@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"io"
+	"log"
 	"net/url"
 	"path"
 	"time"
@@ -20,7 +21,6 @@ type FileMeta struct {
 	Path         string
 	IsDir        bool
 	Size         int64
-	ContentType  string
 	LastModified time.Time
 }
 
@@ -42,7 +42,7 @@ func newDirMeta(fullname string, mt time.Time) *FileMeta {
 }
 
 func (m *FileMeta) toObject(repoID, ownerID, parentID int) *model.FileObject {
-	object := &model.FileObject{
+	return &model.FileObject{
 		RepoID:   repoID,
 		OwnerID:  ownerID,
 		ParentID: parentID,
@@ -51,12 +51,6 @@ func (m *FileMeta) toObject(repoID, ownerID, parentID int) *model.FileObject {
 		Size:     m.Size,
 		IsDir:    m.IsDir,
 	}
-
-	if m.ContentType != "" {
-		object.MimeType = aws.String(m.ContentType)
-	}
-
-	return object
 }
 
 func Init(ctx context.Context, cfg *config.Config) {
@@ -76,12 +70,42 @@ func GetFileInfo(ctx context.Context, resource *model.Resource) (*model.FileObje
 }
 
 // ListDir lists the contents of a directory
-func ListDir(ctx context.Context, parent *model.FileObject) ([]*model.FileObject, error) {
+func ListDir(ctx context.Context, repo *model.Repository, parent *model.FileObject) ([]*model.FileObject, error) {
 	if !parent.IsDir {
 		return nil, nil // return nil for non directory files
 	}
 
-	return db.GetChildFiles(ctx, parent.ID)
+	storage, err := getStorage(repo)
+	if err != nil {
+		return nil, err
+	}
+
+	objects, err := db.GetChildFiles(ctx, parent.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	var changed []*model.FileObject
+	for _, obj := range objects {
+		if obj.MimeType != nil {
+			continue
+		}
+
+		if ct, err := storage.GetContentType(ctx, repo.Name, obj.Path); err == nil {
+			obj.MimeType = aws.String(ct)
+		} else {
+			obj.MimeType = aws.String(getContentType(path.Ext(obj.Name)))
+		}
+		changed = append(changed, obj)
+	}
+
+	if len(changed) > 0 {
+		if err := db.UpdateContentType(ctx, changed); err != nil {
+			log.Printf("Failed to update content type: %s", err)
+		}
+	}
+
+	return objects, nil
 }
 
 // CreateDir creates a directory entry in the database
@@ -110,6 +134,8 @@ type Storage interface {
 	CopyFile(ctx context.Context, repo, srcName, destName string) error
 	// Scan scanes existing objects of storage.
 	Scan(ctx context.Context, repo string, visit func(*FileMeta) error) error
+	// GetContentType returns content type of file
+	GetContentType(ctx context.Context, repo, name string) (string, error)
 }
 
 // getStorage returns the appropriate Storage implementation based on the repository's Root URL

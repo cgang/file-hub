@@ -124,8 +124,6 @@ func (s *s3Storage) Scan(ctx context.Context, repo string, visit func(*FileMeta)
 		for _, obj := range output.Contents {
 			meta := newFileMeta(aws.ToString(obj.Key), aws.ToTime(obj.LastModified))
 			meta.Size = aws.ToInt64(obj.Size)
-			// TODO support content type
-			meta.ContentType = getContentType(meta.Name) // temporary workaround
 
 			if err := visit(meta); err != nil {
 				return err
@@ -138,4 +136,19 @@ func (s *s3Storage) Scan(ctx context.Context, repo string, visit func(*FileMeta)
 			return nil
 		}
 	}
+}
+
+func (s *s3Storage) GetContentType(ctx context.Context, repo, name string) (string, error) {
+	key := s.getS3Key(repo, name)
+	input := &s3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	}
+
+	output, err := s3Client.HeadObject(ctx, input)
+	if err != nil {
+		return "", err
+	}
+
+	return aws.ToString(output.ContentType), nil
 }

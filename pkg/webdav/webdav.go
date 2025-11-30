@@ -170,7 +170,7 @@ func handlePropfind(c *gin.Context) {
 	// Add the file/directory itself
 	ms.Response = append(ms.Response, createResponse(c.Request.URL.Path, file))
 	// If it's a directory, list its contents
-	files, err := stor.ListDir(c, file)
+	files, err := stor.ListDir(c, resource.Repo, file)
 	if err != nil {
 		log.Printf("Error reading directory %s: %v", resource, err)
 		sendError(c, http.StatusInternalServerError, "Failed to read directory: %v", err)

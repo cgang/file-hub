@@ -230,3 +230,9 @@ func DeleteFileByPath(ctx context.Context, path string, userID int) error {
 
 	return nil
 }
+
+// UpdateContentType updates content type of specified objects in database.
+func UpdateContentType(ctx context.Context, objects []*model.FileObject) error {
+	// TODO add batch implementation
+	return nil
+}

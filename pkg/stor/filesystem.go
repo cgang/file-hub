@@ -84,12 +84,14 @@ func (s *fsStorage) Scan(ctx context.Context, repo string, visit func(*FileMeta)
 		meta.LastModified = info.ModTime()
 		if !d.IsDir() {
 			meta.Size = info.Size()
-			meta.ContentType = getContentType(meta.Name)
 		}
 
 		return visit(meta)
 	})
+}
 
+func (s *fsStorage) GetContentType(ctx context.Context, repo, name string) (string, error) {
+	return getContentType(path.Ext(name)), nil
 }
 
 func getContentType(ext string) string {
