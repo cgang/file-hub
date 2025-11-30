@@ -13,7 +13,7 @@ import (
 // UserModel represents a user in the system
 type UserModel struct {
 	bun.BaseModel `bun:"table:users"`
-	*model.User   `bun:",inherit"`
+	*model.User
 }
 
 func wrapUser(mu *model.User) *UserModel {

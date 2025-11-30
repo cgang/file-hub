@@ -3,11 +3,12 @@ package stor
 import (
 	"context"
 	"io"
+	"io/fs"
+	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
-
-	"github.com/cgang/file-hub/pkg/model"
 )
 
 // fsStorage implements Storage based on the local filesystem
@@ -15,141 +16,80 @@ type fsStorage struct {
 	rootDir string
 }
 
-func newFsStorage(user *model.User, rootDir string) *fsStorage {
-	return &fsStorage{
-		rootDir: rootDir,
-	}
-}
-
 // getFullPath combines the user's home directory with the relative path
-func (s *fsStorage) getFullPath(path string) string {
-	cleanPath := filepath.Clean(path)
-	fullPath := filepath.Join(s.rootDir, cleanPath)
-
-	// Ensure the path is still within the user's home directory
-	// This prevents directory traversal attacks
-	if !strings.HasPrefix(fullPath, s.rootDir+string(filepath.Separator)) && fullPath != s.rootDir {
-		// If the path is outside the user's home directory, default to the home directory
-		return s.rootDir
-	}
-
-	return fullPath
+func (s *fsStorage) getFullPath(repo, name string) string {
+	return path.Join(s.rootDir, repo, path.Clean(name))
 }
 
-func (s *fsStorage) CreateFile(ctx context.Context, path string) (*os.File, error) {
-	fullPath := s.getFullPath(path)
-	return os.Create(fullPath)
-}
+func (s *fsStorage) PutFile(ctx context.Context, repo, name string, data io.Reader) error {
+	fullPath := s.getFullPath(repo, name)
 
-func (s *fsStorage) DeleteFile(ctx context.Context, path string) error {
-	fullPath := s.getFullPath(path)
-	return os.RemoveAll(fullPath)
-}
-
-func (s *fsStorage) CreateDir(ctx context.Context, path string) error {
-	fullPath := s.getFullPath(path)
-	return os.MkdirAll(fullPath, 0755)
-}
-
-func (s *fsStorage) CopyFile(ctx context.Context, src, dst string) error {
-	// Handle directory or file copy
-	srcFullPath := s.getFullPath(src)
-	dstFullPath := s.getFullPath(dst)
-
-	srcInfo, err := os.Stat(srcFullPath)
-	if err != nil {
+	dir := path.Dir(fullPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
 
-	if srcInfo.IsDir() {
-		return copyDir(ctx, srcFullPath, dstFullPath)
-	}
-	return copyFile(ctx, srcFullPath, dstFullPath)
-}
-
-func (s *fsStorage) MoveFile(ctx context.Context, src, dst string) error {
-	srcFullPath := s.getFullPath(src)
-	dstFullPath := s.getFullPath(dst)
-	return os.Rename(srcFullPath, dstFullPath)
-}
-
-func (s *fsStorage) OpenFile(ctx context.Context, path string) (io.ReadCloser, error) {
-	fullPath := s.getFullPath(path)
-	return os.Open(fullPath)
-}
-
-func (s *fsStorage) WriteToFile(ctx context.Context, path string, content io.Reader) error {
-	// Create directory if needed
-	fullPath := s.getFullPath(path)
-	dirPath := filepath.Dir(fullPath)
-	if err := s.CreateDir(ctx, dirPath); err != nil {
-		return err
-	}
-
-	// Open file for writing
 	file, err := os.Create(fullPath)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	// Copy content
-	_, err = io.Copy(file, content)
+	_, err = io.Copy(file, data)
 	return err
 }
 
-// Helper functions
-func copyFile(ctx context.Context, src, dst string) error {
-	// Create destination directory if needed
-	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
-		return err
-	}
-
-	srcFile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer srcFile.Close()
-
-	dstFile, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer dstFile.Close()
-
-	_, err = io.Copy(dstFile, srcFile)
-	return err
+func (s *fsStorage) DeleteFile(ctx context.Context, repo, name string) error {
+	fullPath := s.getFullPath(repo, name)
+	return os.Remove(fullPath)
 }
 
-func copyDir(ctx context.Context, src, dst string) error {
-	// Create destination directory
-	if err := os.MkdirAll(dst, 0755); err != nil {
-		return err
-	}
+func (s *fsStorage) OpenFile(ctx context.Context, repo, name string) (io.ReadCloser, error) {
+	fullPath := s.getFullPath(repo, name)
+	return os.Open(fullPath)
+}
 
-	// Read directory contents
-	files, err := os.ReadDir(src)
+func (s *fsStorage) CopyFile(ctx context.Context, repo, srcName, destName string) error {
+	srcPath := s.getFullPath(repo, srcName)
+
+	input, err := os.Open(srcPath)
 	if err != nil {
 		return err
 	}
+	defer input.Close()
 
-	// Copy each file/dir
-	for _, file := range files {
-		srcPath := filepath.Join(src, file.Name())
-		dstPath := filepath.Join(dst, file.Name())
+	return s.PutFile(ctx, repo, destName, input)
+}
 
-		if file.IsDir() {
-			if err := copyDir(ctx, srcPath, dstPath); err != nil {
-				return err
-			}
-		} else {
-			if err := copyFile(ctx, srcPath, dstPath); err != nil {
-				return err
-			}
+func (s *fsStorage) Scan(ctx context.Context, repo string, visit func(*FileMeta) error) error {
+	rootDir := s.getFullPath(repo, "")
+
+	return filepath.WalkDir(rootDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			log.Printf("Error occurs while walk to %s: %s", path, err)
+			return filepath.SkipDir
 		}
-	}
 
-	return nil
+		meta := &FileMeta{
+			Name:  d.Name(),
+			Path:  path,
+			IsDir: d.IsDir(),
+		}
+
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+
+		meta.LastModified = info.ModTime()
+		if !d.IsDir() {
+			meta.Size = info.Size()
+			meta.ContentType = getContentType(meta.Name)
+		}
+
+		return visit(meta)
+	})
+
 }
 
 func getContentType(ext string) string {

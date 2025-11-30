@@ -3,7 +3,6 @@ package webdav
 import (
 	"context"
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -14,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cgang/file-hub/pkg/db"
 	"github.com/cgang/file-hub/pkg/model"
 	"github.com/cgang/file-hub/pkg/stor"
 	"github.com/gin-gonic/gin"
@@ -45,14 +43,14 @@ func Register(v1 *gin.RouterGroup) {
 	// Note: Authentication should be handled by a middleware in the calling code
 	v1.Use(setDavHeaders)
 
-	v1.PUT("/:repos/*path", handlePut)
-	v1.DELETE("/:repos/*path", handleDelete)
-	v1.GET("/:repos/*path", handleGet)
+	v1.PUT("/:repo/*path", handlePut)
+	v1.DELETE("/:repo/*path", handleDelete)
+	v1.GET("/:repo/*path", handleGet)
 
-	v1.Handle("PROPFIND", "/:repos/*path", handlePropfind)
-	v1.Handle("MKCOL", "/:repos/*path", handleMkcol)
-	v1.Handle("COPY", "/:repos/*path", handleCopyMove)
-	v1.Handle("MOVE", "/:repos/*path", handleCopyMove)
+	v1.Handle("PROPFIND", "/:repo/*path", handlePropfind)
+	v1.Handle("MKCOL", "/:repo/*path", handleMkcol)
+	v1.Handle("COPY", "/:repo/*path", handleCopyMove)
+	v1.Handle("MOVE", "/:repo/*path", handleCopyMove)
 }
 
 // XML structures for WebDAV
@@ -96,7 +94,7 @@ func sendError(c *gin.Context, status int, format string, a ...any) {
 }
 
 func getResource(c *gin.Context) (*model.Resource, error) {
-	name := c.Param("repos")
+	name := c.Param("repo")
 	repo, err := stor.GetRepository(c, name)
 	if err != nil {
 		sendError(c, http.StatusBadRequest, "Repository not found")
@@ -159,7 +157,7 @@ func handlePropfind(c *gin.Context) {
 	// Get file info using storage abstraction
 	file, err := stor.GetFileInfo(c, resource)
 	if err != nil {
-		if errors.Is(err, db.ErrFileNotFound) {
+		if stor.IsNotFound(err) {
 			sendError(c, http.StatusNotFound, "File not found")
 			return
 		}
@@ -194,14 +192,13 @@ func createResponse(href string, file *model.FileObject) Response {
 		Name:         name,
 		DisplayName:  name,
 		LastModified: file.UpdatedAt.UTC().Format(time.RFC1123),
+		ContentType:  file.ContentType(),
 	}
 
-	if file.Directory {
+	if file.IsDir {
 		prop.IsCollection = "1"
-		prop.ContentType = "httpd/unix-directory"
 	} else {
 		prop.IsCollection = "0"
-		prop.ContentType = file.ContentType
 		prop.Length = fmt.Sprintf("%d", file.Size)
 	}
 
@@ -232,7 +229,7 @@ func handlePut(c *gin.Context) {
 	}
 
 	// Write file using storage abstraction
-	if err := stor.WriteToFile(c, resource, c.Request.Body); err != nil {
+	if err := stor.PutFile(c, resource, c.Request.Body); err != nil {
 		sendError(c, http.StatusInternalServerError, "Failed to write file: %v", err)
 		return
 	}
@@ -374,12 +371,12 @@ func handleGet(c *gin.Context) {
 		return
 	}
 
-	if info.Directory {
+	if info.IsDir {
 		sendError(c, http.StatusBadRequest, "Cannot GET a directory")
 		return
 	}
 
-	c.Header("Content-Type", info.ContentType)
+	c.Header("Content-Type", info.ContentType())
 	c.Header("Content-Length", fmt.Sprintf("%d", info.Size))
 
 	file, err := stor.OpenFile(c, resource)

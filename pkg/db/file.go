@@ -3,7 +3,6 @@ package db
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"time"
 
@@ -11,14 +10,10 @@ import (
 	"github.com/uptrace/bun"
 )
 
-var (
-	ErrFileNotFound = errors.New("file not found")
-)
-
 // FileModel represents a file object for database operations
 type FileModel struct {
-	bun.BaseModel     `bun:"table:files"`
-	*model.FileObject `bun:",inherit"`
+	bun.BaseModel `bun:"table:files"`
+	*model.FileObject
 }
 
 func wrapFile(mo *model.FileObject) *FileModel {
@@ -78,10 +73,7 @@ func GetFile(ctx context.Context, reposID int, path string) (*model.FileObject, 
 		Scan(ctx)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, ErrFileNotFound
-		}
-		return nil, fmt.Errorf("failed to get file: %w", err)
+		return nil, err
 	}
 
 	return file.FileObject, nil

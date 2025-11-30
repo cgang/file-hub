@@ -8,8 +8,8 @@ import (
 )
 
 type ReposModel struct {
-	bun.BaseModel     `bun:"table:repositories"`
-	*model.Repository `bun:",inherit"`
+	bun.BaseModel `bun:"table:repositories"`
+	*model.Repository
 }
 
 func wrapRepos(mo *model.Repository) *ReposModel {

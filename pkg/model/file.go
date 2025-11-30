@@ -19,7 +19,7 @@ type Repository struct {
 // It contains the necessary information to identify the share and the associated user.
 type Share struct {
 	ID      int    `json:"id" bun:"id,pk,autoincrement"`
-	ReposID int    `json:"repo_id" bun:"repo_id,notnull"`
+	RepoID  int    `json:"repo_id" bun:"repo_id,notnull"`
 	OwnerID int    `json:"owner_id" bun:"owner_id,notnull"`
 	UserID  int    `json:"user_id" bun:"user_id,notnull"`
 	Path    string `json:"path" bun:"path,notnull"`
@@ -28,17 +28,28 @@ type Share struct {
 // FileObject represents a file stored in a repository.
 // It contains metadata about the file such as its path, size, and MIME type.
 type FileObject struct {
-	ID          int       `json:"id" bun:"id,pk,autoincrement"`
-	ParentID    int       `json:"parent_id,omitempty" bun:"parent_id"`
-	OwnerID     int       `json:"owner_id" bun:"owner_id,notnull"`
-	ReposID     int       `json:"repo_id" bun:"repo_id,notnull"`
-	Name        string    `json:"name" bun:"name,notnull"`
-	Path        string    `json:"path" bun:"path,notnull"`
-	MimeType    *string   `json:"mime_type,omitempty" bun:"mime_type"`
-	Size        int64     `json:"size" bun:"size,notnull"`
-	Checksum    *string   `json:"checksum,omitempty" bun:"checksum"`
-	CreatedAt   time.Time `json:"created_at" bun:"created_at,notnull"`
-	UpdatedAt   time.Time `json:"updated_at" bun:"updated_at,notnull"`
-	Directory   bool      `json:"is_dir" bun:"is_dir"`
-	ContentType string    `json:"-" bun:"-"`
+	ID        int       `json:"id" bun:"id,pk,autoincrement"`
+	ParentID  int       `json:"parent_id,omitempty" bun:"parent_id"`
+	OwnerID   int       `json:"owner_id" bun:"owner_id,notnull"`
+	RepoID    int       `json:"repo_id" bun:"repo_id,notnull"`
+	Name      string    `json:"name" bun:"name,notnull"`
+	Path      string    `json:"path" bun:"path,notnull"`
+	MimeType  *string   `json:"mime_type,omitempty" bun:"mime_type"`
+	Size      int64     `json:"size" bun:"size,notnull"`
+	Checksum  *string   `json:"checksum,omitempty" bun:"checksum"`
+	CreatedAt time.Time `json:"created_at" bun:"created_at,notnull"`
+	UpdatedAt time.Time `json:"updated_at" bun:"updated_at,notnull"`
+	IsDir     bool      `json:"is_dir" bun:"is_dir"`
+}
+
+func (o *FileObject) ContentType() string {
+	if o.IsDir {
+		return "httpd/unix-directory"
+	}
+
+	if mt := o.MimeType; mt != nil {
+		return *mt
+	} else {
+		return "application/octet-stream"
+	}
 }

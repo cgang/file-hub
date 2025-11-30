@@ -12,7 +12,7 @@ import (
 // ShareModel represents a share object for database operations
 type ShareModel struct {
 	bun.BaseModel `bun:"table:shares"`
-	*model.Share  `bun:",inherit"`
+	*model.Share
 }
 
 func wrapShare(mo *model.Share) *ShareModel {

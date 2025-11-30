@@ -12,8 +12,8 @@ import (
 
 // UserQuotaModel represents storage quota for a user
 type UserQuotaModel struct {
-	bun.BaseModel    `bun:"table:user_quota"`
-	*model.UserQuota `bun:",inherit"`
+	bun.BaseModel `bun:"table:user_quota"`
+	*model.UserQuota
 }
 
 func wrapQuota(mq *model.UserQuota) *UserQuotaModel {

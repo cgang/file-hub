@@ -9,6 +9,7 @@ import (
 
 	"github.com/cgang/file-hub/pkg/config"
 	"github.com/cgang/file-hub/pkg/db"
+	"github.com/cgang/file-hub/pkg/stor"
 	"github.com/cgang/file-hub/pkg/users"
 	"github.com/cgang/file-hub/pkg/web"
 )
@@ -22,6 +23,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	db.Init(ctx, cfg.Database.URI)
+	stor.Init(ctx, cfg)
 	users.Init(ctx, cfg.Realm)
 
 	web.Start(ctx, cfg.Web)
