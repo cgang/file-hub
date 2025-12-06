@@ -29,7 +29,7 @@ func Register(r *gin.RouterGroup) {
 func SetupHandler(c *gin.Context) {
 	// Check if database is empty, if not reject the request
 	if ok, err := users.HasAnyUser(c.Request.Context()); err != nil || ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Setup already completed"})
+		c.String(http.StatusBadRequest, "Setup already completed")
 		return
 	}
 
@@ -40,7 +40,7 @@ func SetupHandler(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		c.String(http.StatusBadRequest, "Invalid request format")
 		return
 	}
 
@@ -55,7 +55,7 @@ func SetupHandler(c *gin.Context) {
 	// Save the user to the database
 	user, err := users.CreateFirstUser(c, userReq)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user: " + err.Error()})
+		c.String(http.StatusInternalServerError, "Failed to create user: "+err.Error())
 		return
 	}
 

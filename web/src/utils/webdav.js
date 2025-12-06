@@ -14,6 +14,28 @@ function createRequestHeaders() {
 }
 
 /**
+ * Handle HTTP errors by parsing response text and creating an appropriate error object
+ * @param {Response} response - The fetch response object
+ * @param {string} prefix - Operation-specific prefix for the error message
+ * @returns {never} - Throws an error
+ */
+async function handleHttpError(response, prefix) {
+  const text = await response.text();
+  let errorText = text;
+  try {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(text, 'application/xml');
+    const errorElement = xmlDoc.getElementsByTagName('error')[0];
+    if (errorElement) {
+      errorText = errorElement.textContent || text;
+    }
+  } catch (parseError) {
+    // If parsing fails, use the original text
+  }
+  throw new Error(`${prefix}: ${response.status} ${response.statusText} - ${errorText}`);
+}
+
+/**
  * List directory contents using PROPFIND
  * @param {string} path - Path to list
  * @returns {Promise<Array>} Array of file/directory objects
@@ -28,14 +50,14 @@ export async function listDirectory(path) {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to list directory: ${response.status} ${response.statusText}`);
+    handleHttpError(response, 'Failed to list directory');
   }
 
   const responseText = await response.text();
 
   // Parse the XML response from WebDAV
   const parser = new DOMParser();
-  const xmlDoc = parser.parseFromString(responseText, 'text/xml');
+  const xmlDoc = parser.parseFromString(responseText, 'application/xml');
 
   // Extract file and directory information
   const responses = xmlDoc.getElementsByTagName('response');
@@ -123,7 +145,7 @@ export async function uploadFile(path, file) {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to upload file: ${response.status} ${response.statusText}`);
+    handleHttpError(response, 'Failed to upload file');
   }
 
   return response;
