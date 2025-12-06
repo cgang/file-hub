@@ -29,8 +29,17 @@ func newRepos(id int) *ReposModel {
 }
 
 func CreateRepository(ctx context.Context, mo *model.Repository) error {
-	_, err := db.NewInsert().Model(wrapRepos(mo)).Exec(ctx)
-	return err
+	res, err := db.NewInsert().Model(wrapRepos(mo)).Exec(ctx)
+	if err != nil {
+		return err
+	}
+
+	if id, err := res.LastInsertId(); err == nil {
+		mo.ID = int(id)
+		return nil
+	} else {
+		return err
+	}
 }
 
 func GetRepositoryByID(ctx context.Context, id int) (*model.Repository, error) {

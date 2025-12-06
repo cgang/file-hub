@@ -36,6 +36,7 @@ type Config struct {
 	Web      WebConfig      `yaml:"web"`
 	Database DatabaseConfig `yaml:"database"`
 	S3       *S3Config      `yaml:"s3,omitempty"`
+	RootDir  []string       `yaml:"root_dir"`
 }
 
 // getConfigDirs returns a list of directories to search for config files
@@ -116,6 +117,7 @@ func newDefaultConfig() *Config {
 		Database: DatabaseConfig{
 			URI: "postgresql://filehub:filehub@localhost:5432/filehub",
 		},
+		RootDir: []string{"/tmp"},
 		// S3 configuration is optional and defaults to nil
 	}
 }

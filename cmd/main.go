@@ -15,6 +15,8 @@ import (
 )
 
 func main() {
+	log.Default().SetOutput(os.Stdout) // switch to standard output
+
 	cfg, err := config.LoadConfig("config.yaml")
 	if err != nil {
 		log.Fatalf("Failed to get config: %s", err)
@@ -26,7 +28,7 @@ func main() {
 	stor.Init(ctx, cfg)
 	users.Init(ctx, cfg.Realm)
 
-	web.Start(ctx, cfg.Web)
+	web.Start(ctx, cfg.Web, cfg.Realm)
 
 	// wait for termination signal
 	sigs := make(chan os.Signal, 1)

@@ -1,7 +1,35 @@
 // WebDAV utility functions for File Hub web UI
 
-// Base path for WebDAV requests
-const WEBDAV_BASE_PATH = '/dav';
+let _davPath = null;
+
+/**
+ * Fetch DAV path from /api/hello
+ * @returns {Promise<string>} The DAV base path
+ */
+async function fetchDavPath() {
+  if (_davPath) return _davPath;
+  
+  const response = await fetch('/api/hello');
+  if (!response.ok) {
+    throw new Error('Failed to fetch DAV path');
+  }
+  
+  const data = await response.json();
+  if (!data.dav) {
+    throw new Error('DAV path not found in API response');
+  }
+  
+  _davPath = data.dav;
+  return _davPath;
+}
+
+/**
+ * Get DAV path with caching
+ * @returns {Promise<string>} The DAV base path
+ */
+async function getDavPath() {
+  return _davPath || fetchDavPath();
+}
 
 /**
  * Create authorization header for WebDAV requests
@@ -41,7 +69,8 @@ async function handleHttpError(response, prefix) {
  * @returns {Promise<Array>} Array of file/directory objects
  */
 export async function listDirectory(path) {
-  const response = await fetch(`${WEBDAV_BASE_PATH}${path}`, {
+  const davPath = await getDavPath();
+const response = await fetch(`${davPath}${path}`, {
     method: 'PROPFIND',
     headers: {
       ...createRequestHeaders(),
@@ -71,8 +100,9 @@ export async function listDirectory(path) {
 
     // Convert href to a relative path by removing the WebDAV URL prefix
     let relativeHref = decodeURIComponent(href);
-    if (relativeHref.startsWith(WEBDAV_BASE_PATH)) {
-      relativeHref = relativeHref.substring(WEBDAV_BASE_PATH.length);
+    const davPath = await getDavPath();
+    if (relativeHref.startsWith(davPath)) {
+      relativeHref = relativeHref.substring(davPath.length);
       // Ensure path starts with / after removing prefix
       if (!relativeHref.startsWith('/')) {
         relativeHref = '/' + relativeHref;
@@ -138,7 +168,8 @@ export async function uploadFile(path, file) {
   // Create the full file path
   const fullPath = path + file.name;
 
-  const response = await fetch(`${WEBDAV_BASE_PATH}${fullPath}`, {
+  const davPath = await getDavPath();
+const response = await fetch(`${davPath}${fullPath}`, {
     method: 'PUT',
     headers: createRequestHeaders(),
     body: file
@@ -150,68 +181,3 @@ export async function uploadFile(path, file) {
 
   return response;
 }
-
-/*
- * The following functions are not currently used in the UI but are kept for future expansion
- */
-
-/*
- * Download a file
- * @param {string} path - Path to the file
- * @returns {Promise<Blob>} File blob
- *
-export async function downloadFile(path) {
-  const response = await fetch(`${WEBDAV_BASE_PATH}${path}`, {
-    method: 'GET',
-    headers: createRequestHeaders()
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
-  }
-
-  return response.blob();
-}
-*/
-
-/*
- * Delete a file or directory
- * @param {string} path - Path to the file or directory
- * @returns {Promise<Response>} Fetch response
- *
-export async function deleteFile(path) {
-  const response = await fetch(`${WEBDAV_BASE_PATH}${path}`, {
-    method: 'DELETE',
-    headers: createRequestHeaders()
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to delete file: ${response.status} ${response.statusText}`);
-  }
-
-  return response;
-}
-*/
-
-/*
- * Create a directory
- * @param {string} path - Parent directory path
- * @param {string} dirName - Name of the directory to create
- * @returns {Promise<Response>} Fetch response
- *
-export async function createDirectory(path, dirName) {
-  // Create the full directory path
-  const fullPath = path + dirName;
-
-  const response = await fetch(`${WEBDAV_BASE_PATH}${fullPath}`, {
-    method: 'MKCOL',
-    headers: createRequestHeaders()
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to create directory: ${response.status} ${response.statusText}`);
-  }
-
-  return response;
-}
-*/

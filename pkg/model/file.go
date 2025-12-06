@@ -10,7 +10,7 @@ type Repository struct {
 	ID        int       `json:"id" bun:"id,pk,autoincrement"`
 	OwnerID   int       `json:"owner_id" bun:"owner_id,notnull"`
 	Name      string    `json:"name" bun:"name,notnull"`
-	RootURL   string    `json:"root_url" bun:"root_url,notnull"`
+	Root      string    `json:"root" bun:"root,notnull"`
 	CreatedAt time.Time `json:"created_at" bun:"created_at,notnull"`
 	UpdatedAt time.Time `json:"updated_at" bun:"updated_at,notnull"`
 }

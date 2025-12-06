@@ -69,7 +69,7 @@ func GetFile(ctx context.Context, reposID int, path string) (*model.FileObject, 
 	file := newFile(0)
 	err := db.NewSelect().
 		Model(file).
-		Where("repos_id = ? AND path = ? AND deleted = ?", reposID, path, false).
+		Where("repo_id = ? AND path = ? AND deleted = ?", reposID, path, false).
 		Scan(ctx)
 
 	if err != nil {

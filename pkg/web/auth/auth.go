@@ -9,19 +9,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SessionStore is the session store instance
-var SessionStore *session.Store
+const (
+	SessionCookieName = "filehub_session"
+)
 
-// Realm is the authentication realm
-const Realm = "FileHub"
-const SessionCookieName = "filehub_session"
+var (
+	nonceStore   = NewNonceStore()
+	SessionStore *session.Store
+	userRealm    string
+)
 
-// NonceStore stores nonces for digest authentication
-var nonceStore = NewNonceStore()
-
-// SetSessionStore sets the session store instance
-func SetSessionStore(store *session.Store) {
+func Init(store *session.Store, realm string) {
 	SessionStore = store
+	userRealm = realm
 }
 
 // Authenticate handles authentication with support for sessions
@@ -41,7 +41,7 @@ func Authenticate(c *gin.Context) {
 	authStr := c.GetHeader("Authorization")
 	if authStr == "" {
 		// Create a digest challenge
-		challenge, err := createDigestChallenge(Realm)
+		challenge, err := createDigestChallenge(userRealm)
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Failed to create auth challenge")
 			c.Abort()
@@ -49,7 +49,7 @@ func Authenticate(c *gin.Context) {
 		}
 
 		// Also support basic auth
-		c.Header("WWW-Authenticate", `Basic realm="`+Realm+`"`)
+		c.Header("WWW-Authenticate", `Basic realm="`+userRealm+`"`)
 		c.Header("WWW-Authenticate", generateWWWAuthenticateHeader(challenge))
 		c.String(http.StatusUnauthorized, "No authorization provided")
 		c.Abort()
@@ -65,9 +65,9 @@ func Authenticate(c *gin.Context) {
 
 	switch kind {
 	case "Basic":
-		handleBasicAuth(c, creds, Realm)
+		handleBasicAuth(c, creds, userRealm)
 	case "Digest":
-		handleDigestAuth(c, authStr, nonceStore, Realm)
+		handleDigestAuth(c, authStr, nonceStore, userRealm)
 	default:
 		c.String(http.StatusBadRequest, "Unsupported authorization method")
 		c.Abort()

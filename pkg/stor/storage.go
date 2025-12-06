@@ -7,7 +7,9 @@ import (
 	"io"
 	"log"
 	"net/url"
+	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -53,15 +55,50 @@ func (m *FileMeta) toObject(repoID, ownerID, parentID int) *model.FileObject {
 	}
 }
 
+var (
+	rootDirs []string
+)
+
 func Init(ctx context.Context, cfg *config.Config) {
 	if cfg.S3 != nil {
 		s3Client = newS3Client(cfg.S3)
 	}
+	rootDirs = cfg.RootDir
 }
 
 // IsNotFound return true if err is something not found.
 func IsNotFound(err error) bool {
 	return errors.Is(err, sql.ErrNoRows)
+}
+
+func isConfiguredRoot(root string) bool {
+	for _, dir := range rootDirs {
+		if t := strings.TrimPrefix(root, dir); t != root && strings.HasPrefix(t, "/") {
+			return true
+		}
+	}
+	return false
+}
+
+func ValidRoot(root string) bool {
+	root = path.Clean(root)
+	if !isConfiguredRoot(root) {
+		return false
+	}
+
+	if s, err := os.Stat(root); err == nil {
+		return s.IsDir()
+	} else if os.IsNotExist(err) {
+		if err := os.MkdirAll(root, 0755); err == nil {
+			return true
+		} else {
+			log.Printf("Failed to create directory %s: %s", root, err)
+		}
+	} else {
+		log.Printf("Failed to check directory %s: %s", root, err)
+	}
+
+	return false
 }
 
 // GetFileInfo retrieves file metadata from the database
@@ -140,7 +177,7 @@ type Storage interface {
 
 // getStorage returns the appropriate Storage implementation based on the repository's Root URL
 func getStorage(repo *model.Repository) (Storage, error) {
-	u, err := url.Parse(repo.RootURL)
+	u, err := url.Parse(repo.Root)
 	if err != nil {
 		return nil, err
 	}

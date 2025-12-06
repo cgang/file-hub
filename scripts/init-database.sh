@@ -13,6 +13,12 @@ set -e  # Exit on any error
 echo "=== File Hub Database Initialization Script ==="
 echo ""
 
+SCRIPT_DIR=`dirname $0`
+if [ ! -f "${SCRIPT_DIR}/database_schema.sql" ]; then
+  echo "Database schema file not found under ${SCRIPT_DIR}"
+  exit 1
+fi
+
 # Default values
 DEFAULT_DB_HOST="localhost"
 DEFAULT_DB_PORT="5432"
@@ -87,7 +93,7 @@ echo ""
 echo "Applying database schema..."
 # Connect to the new database and apply schema
 export PGPASSWORD="$DB_PASSWORD"
-psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "./scripts/database_schema.sql"
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "${SCRIPT_DIR}/database_schema.sql"
 
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to apply database schema."
