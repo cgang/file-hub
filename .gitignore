@@ -39,7 +39,8 @@ web/.svelte-kit/
 web/.vite/
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+
 # Cline AI Assistant files
 *.cline
