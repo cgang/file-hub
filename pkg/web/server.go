@@ -9,8 +9,8 @@ import (
 	"github.com/cgang/file-hub/pkg/config"
 	"github.com/cgang/file-hub/pkg/web/api"
 	"github.com/cgang/file-hub/pkg/web/auth"
+	"github.com/cgang/file-hub/pkg/web/dav"
 	"github.com/cgang/file-hub/pkg/web/session"
-	"github.com/cgang/file-hub/pkg/webdav"
 	"github.com/cgang/file-hub/web"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
@@ -46,7 +46,7 @@ func Start(ctx context.Context, cfg config.WebConfig) {
 	// Register WebDAV with authentication middleware
 	webdavGroup := engine.Group("/dav")
 	webdavGroup.Use(auth.Authenticate)
-	webdav.Register(webdavGroup)
+	dav.Register(webdavGroup)
 
 	engine.StaticFS("/ui", uiFiles)
 	engine.GET("/", func(c *gin.Context) {
