@@ -12,7 +12,6 @@ import (
 	"github.com/cgang/file-hub/pkg/web/api"
 	"github.com/cgang/file-hub/pkg/web/auth"
 	"github.com/cgang/file-hub/pkg/web/dav"
-	"github.com/cgang/file-hub/pkg/web/session"
 	"github.com/cgang/file-hub/web"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
@@ -37,10 +36,8 @@ func defaultRoute(c *gin.Context) {
 	}
 }
 
-func Start(ctx context.Context, cfg config.WebConfig, realm string) {
-	// Initialize session store
-	sessionStore := session.NewStore()
-	auth.Init(sessionStore, realm)
+func Start(ctx context.Context, cfg *config.Config) {
+	auth.Init(cfg)
 
 	// Create a sub filesystem from the embedded files
 	uiFiles, err := web.StaticFiles()
@@ -50,12 +47,12 @@ func Start(ctx context.Context, cfg config.WebConfig, realm string) {
 
 	engine := gin.Default()
 
-	if cfg.Metrics {
+	if cfg.Web.Metrics {
 		// Register Prometheus metrics endpoint
 		engine.Handle(http.MethodGet, "/metrics", gin.WrapH(promhttp.Handler()))
 	}
 
-	if cfg.Debug {
+	if cfg.Web.Debug {
 		gin.SetMode(gin.DebugMode)
 		pprof.Register(engine)
 	}
@@ -70,7 +67,7 @@ func Start(ctx context.Context, cfg config.WebConfig, realm string) {
 	engine.StaticFS("/ui", uiFiles)
 	engine.GET("/", defaultRoute)
 
-	addr := fmt.Sprintf(":%d", cfg.Port)
+	addr := fmt.Sprintf(":%d", cfg.Web.Port)
 	log.Printf("Starting Web server at %s", addr)
 	server = &http.Server{Addr: addr, Handler: engine.Handler()}
 	go func() {

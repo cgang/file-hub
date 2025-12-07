@@ -1,9 +1,12 @@
 package auth
 
 import (
+	"errors"
+	"log"
 	"net/http"
 	"strings"
 
+	"github.com/cgang/file-hub/pkg/config"
 	"github.com/cgang/file-hub/pkg/model"
 	"github.com/cgang/file-hub/pkg/web/session"
 	"github.com/gin-gonic/gin"
@@ -15,26 +18,23 @@ const (
 
 var (
 	nonceStore   = NewNonceStore()
-	SessionStore *session.Store
+	sessionStore = session.NewStore()
 	userRealm    string
+	availRoots   []string
 )
 
-func Init(store *session.Store, realm string) {
-	SessionStore = store
-	userRealm = realm
+func Init(cfg *config.Config) {
+	userRealm = cfg.Realm
+	availRoots = cfg.RootDir
 }
 
 // Authenticate handles authentication with support for sessions
 func Authenticate(c *gin.Context) {
-	// First, check if there's a valid session cookie
-	sessionID, err := c.Cookie(SessionCookieName)
-	if err == nil && SessionStore != nil {
-		if sess, ok := SessionStore.Get(sessionID); ok {
-			// Valid session found, set user in context and continue
-			c.Set("user", sess.User)
-			c.Next()
-			return
-		}
+	if user, ok := GetSessionUser(c); ok {
+		// Valid session found, set user in context and continue
+		c.Set("user", user)
+		c.Next()
+		return
 	}
 
 	// No valid session, check for Authorization header
@@ -88,11 +88,7 @@ func GetAuthenticatedUser(c *gin.Context) (*model.User, bool) {
 
 // CreateSession creates a new session for the user and sets a cookie
 func CreateSession(c *gin.Context, user *model.User) error {
-	if SessionStore == nil {
-		return nil // Sessions not enabled
-	}
-
-	session, err := SessionStore.Create(user)
+	session, err := sessionStore.Create(user)
 	if err != nil {
 		return err
 	}
@@ -104,15 +100,29 @@ func CreateSession(c *gin.Context, user *model.User) error {
 
 // DestroySession destroys the current session
 func DestroySession(c *gin.Context) {
-	if SessionStore == nil {
-		return // Sessions not enabled
-	}
-
 	sessionID, err := c.Cookie(SessionCookieName)
 	if err == nil {
-		SessionStore.Destroy(sessionID)
+		sessionStore.Destroy(sessionID)
 	}
 
 	// Clear the session cookie
 	c.SetCookie(SessionCookieName, "", -1, "/", "", false, true)
+}
+
+// GetSessionUser retrieves user information using a session ID
+func GetSessionUser(c *gin.Context) (*model.User, bool) {
+	sessionID, err := c.Cookie(SessionCookieName)
+	if err != nil {
+		if !errors.Is(err, http.ErrNoCookie) {
+			log.Printf("Failed to get session ID cookie: %s")
+		}
+		return nil, false
+	}
+
+	sess, ok := sessionStore.Get(sessionID)
+	if !ok {
+		return nil, false
+	}
+
+	return sess.User, true
 }

@@ -1,14 +1,29 @@
 <script>
+import { onMount } from 'svelte';
 import '../styles/setup.css';
 
 let username = '';
 let email = '';
 let password = '';
 let confirmPassword = '';
-let root_dir = '';
+let selectedRoot = '';
+let roots = [];
 let errorMessage = '';
 let successMessage = '';
 let isLoading = false;
+
+onMount(async () => {
+  try {
+    const res = await fetch('/api/roots');
+    roots = await res.json();
+    if (roots.length > 0) {
+      selectedRoot = roots[0];
+    }
+  } catch (err) {
+    errorMessage = 'Failed to load available roots';
+    console.error(err);
+  }
+});
 
 async function handleSubmit() {
   errorMessage = '';
@@ -42,7 +57,7 @@ async function handleSubmit() {
         username,
         email,
         password,
-        root_dir
+        root: selectedRoot
       })
     });
 
@@ -123,16 +138,20 @@ async function handleSubmit() {
         />
       </div>
       
-      <div class="form-group">
-        <label for="rootDir">Root Directory</label>
-        <input 
-          type="text" 
-          id="rootDir" 
-          bind:value={root_dir} 
-          placeholder="/path/to/root"
-          required
-        />
-      </div>
+      {#if roots.length > 0}
+        <div class="form-group repository-selection">
+          <label for="rootSelect">Home Repository</label>
+          <div class="repository-path">
+            <select id="rootSelect" bind:value={selectedRoot} class="repository-select">
+              {#each roots as root}
+                <option value={root}>{root}</option>
+              {/each}
+            </select>
+            <span class="path-separator"> / </span>
+            <span class="username">{username}</span>
+          </div>
+        </div>
+      {/if}
       
       <button 
         type="submit" 

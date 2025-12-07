@@ -28,7 +28,7 @@ func main() {
 	stor.Init(ctx, cfg)
 	users.Init(ctx, cfg.Realm)
 
-	web.Start(ctx, cfg.Web, cfg.Realm)
+	web.Start(ctx, cfg)
 
 	// wait for termination signal
 	sigs := make(chan os.Signal, 1)

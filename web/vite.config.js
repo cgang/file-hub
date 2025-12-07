@@ -8,7 +8,14 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,  // This allows external connections
-    open: false  // Don't automatically open browser
+    open: false,  // Don't automatically open browser
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false
+      }
+    }
   },
   build: {
     outDir: 'dist'

@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/cgang/file-hub/pkg/model"
-	"github.com/cgang/file-hub/pkg/web/session"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
@@ -14,16 +13,6 @@ import (
 func TestSessionMiddleware(t *testing.T) {
 	// Set Gin to test mode
 	gin.SetMode(gin.TestMode)
-
-	// Save original globals
-	originalSessionStore := SessionStore
-	defer func() {
-		SessionStore = originalSessionStore
-	}()
-
-	// Create a session store
-	sessionStore := session.NewStore()
-	SessionStore = sessionStore
 
 	// Create a test user
 	user := &model.User{
@@ -64,16 +53,6 @@ func TestLogoutHandler(t *testing.T) {
 	// Set Gin to test mode
 	gin.SetMode(gin.TestMode)
 
-	// Save original globals
-	originalSessionStore := SessionStore
-	defer func() {
-		SessionStore = originalSessionStore
-	}()
-
-	// Create a session store
-	sessionStore := session.NewStore()
-	SessionStore = sessionStore
-
 	// Create a test user
 	user := &model.User{
 		ID:       1,
@@ -86,7 +65,7 @@ func TestLogoutHandler(t *testing.T) {
 
 	// Create a test router with logout handler
 	router := gin.New()
-	router.POST("/logout", LogoutHandler)
+	router.POST("/logout", Logout)
 
 	// Test logout with valid session
 	req, _ := http.NewRequest("POST", "/logout", nil)
