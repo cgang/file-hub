@@ -21,7 +21,7 @@ func CreateHomeRepo(ctx context.Context, user *model.User, rootDir string) error
 		OwnerID: user.ID,
 		RepoID:  repo.ID,
 		Name:    "/",
-		Path:    "/",
+		Path:    "",
 		IsDir:   true,
 	}
 

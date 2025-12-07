@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/cgang/file-hub/pkg/config"
 	"github.com/cgang/file-hub/pkg/db"
@@ -42,4 +43,5 @@ func main() {
 	cancel()
 
 	// TODO wait for ongoing operations to finish
+	time.Sleep(5 * time.Second)
 }

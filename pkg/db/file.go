@@ -36,7 +36,9 @@ func newFile(id int) *FileModel {
 func CreateFile(ctx context.Context, file *model.FileObject) error {
 	// Set creation timestamp
 	file.CreatedAt = time.Now()
-	file.UpdatedAt = file.CreatedAt
+	if file.UpdatedAt.IsZero() {
+		file.UpdatedAt = file.CreatedAt
+	}
 
 	_, err := db.NewInsert().Model(wrapFile(file)).Exec(ctx)
 	if err != nil {

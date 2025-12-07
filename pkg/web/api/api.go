@@ -21,10 +21,14 @@ func Register(r *gin.RouterGroup) {
 }
 
 func Hello(c *gin.Context) {
-	user, _ := auth.GetAuthenticatedUser(c)
+	user, ok := auth.GetSessionUser(c)
+	if !ok {
+		c.String(http.StatusInternalServerError, "Unable to get user from session")
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Hello, " + user.Username,
 		"dav":     fmt.Sprintf("/dav/%s", user.Username),
-		"user":    user,
 	})
 }

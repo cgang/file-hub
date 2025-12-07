@@ -45,13 +45,14 @@ func newDirMeta(fullname string, mt time.Time) *FileMeta {
 
 func (m *FileMeta) toObject(repoID, ownerID, parentID int) *model.FileObject {
 	return &model.FileObject{
-		RepoID:   repoID,
-		OwnerID:  ownerID,
-		ParentID: parentID,
-		Name:     m.Name,
-		Path:     m.Path,
-		Size:     m.Size,
-		IsDir:    m.IsDir,
+		RepoID:    repoID,
+		OwnerID:   ownerID,
+		ParentID:  parentID,
+		Name:      m.Name,
+		Path:      m.Path,
+		Size:      m.Size,
+		IsDir:     m.IsDir,
+		UpdatedAt: m.LastModified,
 	}
 }
 

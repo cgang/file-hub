@@ -114,7 +114,7 @@ func GetSessionUser(c *gin.Context) (*model.User, bool) {
 	sessionID, err := c.Cookie(SessionCookieName)
 	if err != nil {
 		if !errors.Is(err, http.ErrNoCookie) {
-			log.Printf("Failed to get session ID cookie: %s")
+			log.Printf("Failed to get session ID cookie: %s", err)
 		}
 		return nil, false
 	}

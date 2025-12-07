@@ -49,7 +49,7 @@ func Setup(c *gin.Context) {
 	// Save the user to the database
 	user, err := users.CreateFirstUser(c, userReq)
 	if err != nil {
-		c.String(http.StatusInternalServerError, "Failed to create user: "+err.Error())
+		c.String(http.StatusInternalServerError, "Failed to create user: %s", err)
 		return
 	}
 
@@ -60,6 +60,5 @@ func Setup(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Setup completed successfully. You can now login.",
-		"user":    user,
 	})
 }
