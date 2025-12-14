@@ -48,6 +48,26 @@ body {
   opacity: 0.9;
 }
 
+.scan-button {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  margin-right: 10px;
+}
+
+.scan-button:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.scan-button:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
 .breadcrumbs {
   display: flex;
   align-items: center;
@@ -94,6 +114,15 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.header-section > div:first-child,
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .file-grid {
@@ -141,6 +170,8 @@ body {
   border-radius: 4px;
   cursor: pointer;
   font-weight: 500;
+  width: auto;
+  display: inline-block;
 }
 
 .upload-button:hover {
@@ -222,6 +253,8 @@ body {
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
+  width: auto;
+  align-self: flex-end;
 }
 
 .view-toggle button:hover {

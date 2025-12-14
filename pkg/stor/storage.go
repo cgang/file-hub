@@ -264,7 +264,14 @@ func ImportFiles(ctx context.Context, repo *model.Repository) error {
 	}
 
 	return storage.Scan(ctx, repo.Name, func(fm *FileMeta) error {
-		parent, err := db.GetFile(ctx, repo.ID, path.Dir(fm.Path))
+		if fm.Path == "" {
+			return nil // skip repository root
+		}
+		dir := path.Dir(fm.Path)
+		if dir == "." || dir == "/" {
+			dir = ""
+		}
+		parent, err := db.GetFile(ctx, repo.ID, dir)
 		if err != nil {
 			return err
 		}

@@ -72,7 +72,7 @@ func (s *fsStorage) Scan(ctx context.Context, repo string, visit func(*FileMeta)
 
 		meta := &FileMeta{
 			Name:  d.Name(),
-			Path:  path,
+			Path:  strings.TrimPrefix(path, rootDir),
 			IsDir: d.IsDir(),
 		}
 

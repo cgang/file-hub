@@ -43,5 +43,5 @@ func main() {
 	cancel()
 
 	// TODO wait for ongoing operations to finish
-	time.Sleep(5 * time.Second)
+	time.Sleep(1 * time.Second)
 }

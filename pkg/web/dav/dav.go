@@ -178,7 +178,7 @@ func handlePropfind(c *gin.Context) {
 	}
 
 	for _, entry := range files {
-		entryUrlPath := strings.TrimSuffix(c.Request.URL.Path, "/") + "/" + entry.Path
+		entryUrlPath := strings.TrimSuffix(c.Request.URL.Path, "/") + entry.Path
 		ms.Response = append(ms.Response, createResponse(entryUrlPath, entry))
 	}
 

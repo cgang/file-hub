@@ -12,6 +12,7 @@
   let error = null;
   let breadcrumbs = [{ name: 'Home', path: '/' }];
   let viewMode = 'table'; // 'table' or 'grid'
+  let scanning = false;
 
   // Load the initial directory
   onMount(async () => {
@@ -91,6 +92,31 @@
 
     await loadDirectory(newPath);
   }
+
+  // Function to trigger scan
+  async function triggerScan() {
+    scanning = true;
+    error = null;
+    try {
+      const response = await fetch('/api/scan_files', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Scan failed with status ${response.status}`);
+      }
+
+      // Refresh the directory after scan
+      await loadDirectory(currentPath);
+    } catch (err) {
+      error = `Scan failed: ${err.message}`;
+    } finally {
+      scanning = false;
+    }
+  }
 </script>
 
 <div class="file-browser">
@@ -103,7 +129,12 @@
         </button>
       {/if}
     </div>
-    <UploadComponent on:fileUpload={handleFileUpload} {currentPath} />
+    <div class="header-actions">
+      <button class="scan-button" on:click={triggerScan} disabled={scanning} aria-label="Scan files">
+        {scanning ? 'Scanning...' : 'Scan Files'}
+      </button>
+      <UploadComponent on:fileUpload={handleFileUpload} {currentPath} />
+    </div>
   </div>
 
   {#if error}
