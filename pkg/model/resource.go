@@ -7,5 +7,5 @@ type Resource struct {
 }
 
 func (r *Resource) String() string {
-	return r.Repo.Name + "/" + r.Path
+	return r.Repo.Name + r.Path
 }

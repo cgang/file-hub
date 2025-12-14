@@ -45,7 +45,7 @@ func (s *s3Storage) getS3Key(repo, name string) string {
 	return path.Join(prefix, repo, name)
 }
 
-func (s *s3Storage) PutFile(ctx context.Context, repo, name string, data io.Reader) error {
+func (s *s3Storage) PutFile(ctx context.Context, repo, name string, data io.Reader) (*FileMeta, error) {
 	key := s.getS3Key(repo, name)
 
 	input := &s3.PutObjectInput{
@@ -54,8 +54,17 @@ func (s *s3Storage) PutFile(ctx context.Context, repo, name string, data io.Read
 		Body:   data,
 	}
 
-	_, err := s3Client.PutObject(ctx, input)
-	return err
+	output, err := s3Client.PutObject(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	return &FileMeta{
+		Name:    path.Base(name),
+		Path:    name,
+		Size:    aws.ToInt64(output.Size),
+		ModTime: time.Now(), // TODO get last modified time
+	}, nil
 }
 
 // DeleteFile deletes a file or directory from S3
@@ -88,7 +97,7 @@ func (s *s3Storage) OpenFile(ctx context.Context, repo, name string) (io.ReadClo
 	return output.Body, nil
 }
 
-func (s *s3Storage) CopyFile(ctx context.Context, repo, srcName, destName string) error {
+func (s *s3Storage) CopyFile(ctx context.Context, repo, srcName, destName string) (*FileMeta, error) {
 	srcKey := s.getS3Key(repo, srcName)
 	destKey := s.getS3Key(repo, destName)
 
@@ -97,7 +106,30 @@ func (s *s3Storage) CopyFile(ctx context.Context, repo, srcName, destName string
 		CopySource: aws.String(path.Join(s.bucket, srcKey)),
 		Key:        aws.String(destKey),
 	})
-	return err
+	if err != nil {
+		return nil, err
+	}
+
+	output, err := s.headObject(ctx, destKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return &FileMeta{
+		Name:    path.Base(destName),
+		Path:    destName,
+		Size:    aws.ToInt64(output.ContentLength),
+		ModTime: aws.ToTime(output.LastModified),
+	}, nil
+}
+
+func (s *s3Storage) headObject(ctx context.Context, key string) (*s3.HeadObjectOutput, error) {
+	input := &s3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	}
+
+	return s3Client.HeadObject(ctx, input)
 }
 
 func (s *s3Storage) Scan(ctx context.Context, repo string, visit func(*FileMeta) error) error {

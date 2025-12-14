@@ -21,22 +21,39 @@ func (s *fsStorage) getFullPath(repo, name string) string {
 	return path.Join(s.rootDir, repo, path.Clean(name))
 }
 
-func (s *fsStorage) PutFile(ctx context.Context, repo, name string, data io.Reader) error {
+func (s *fsStorage) PutFile(ctx context.Context, repo, name string, data io.Reader) (*FileMeta, error) {
 	fullPath := s.getFullPath(repo, name)
 
 	dir := path.Dir(fullPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
+		return nil, err
 	}
 
+	if _, err := s.putFile(ctx, fullPath, data); err != nil {
+		return nil, err
+	}
+
+	st, err := os.Stat(fullPath)
+	if err != nil {
+		return nil, err
+	}
+
+	return &FileMeta{
+		Name:    path.Base(name),
+		Path:    name,
+		Size:    st.Size(),
+		ModTime: st.ModTime(),
+	}, nil
+}
+
+func (s *fsStorage) putFile(ctx context.Context, fullPath string, data io.Reader) (int64, error) {
 	file, err := os.Create(fullPath)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer file.Close()
 
-	_, err = io.Copy(file, data)
-	return err
+	return io.Copy(file, data)
 }
 
 func (s *fsStorage) DeleteFile(ctx context.Context, repo, name string) error {
@@ -49,12 +66,12 @@ func (s *fsStorage) OpenFile(ctx context.Context, repo, name string) (io.ReadClo
 	return os.Open(fullPath)
 }
 
-func (s *fsStorage) CopyFile(ctx context.Context, repo, srcName, destName string) error {
+func (s *fsStorage) CopyFile(ctx context.Context, repo, srcName, destName string) (*FileMeta, error) {
 	srcPath := s.getFullPath(repo, srcName)
 
 	input, err := os.Open(srcPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer input.Close()
 

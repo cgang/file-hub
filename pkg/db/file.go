@@ -241,10 +241,10 @@ func UpsertFile(ctx context.Context, file *model.FileObject) error {
 }
 
 // DeleteFileByPath marks a file as deleted by path and user
-func DeleteFileByPath(ctx context.Context, path string, userID int) error {
+func DeleteFileByPath(ctx context.Context, repoID int, path string) error {
 	result, err := db.NewDelete().
 		Model((*FileModel)(nil)).
-		Where("path = ? AND owner_id = ?", path, userID).
+		Where("repo_id = ? AND path = ?", repoID, path).
 		Exec(ctx)
 
 	if err != nil {

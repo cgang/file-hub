@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/url"
@@ -103,7 +104,27 @@ func ValidRoot(root string) bool {
 
 // GetFileInfo retrieves file metadata from the database
 func GetFileInfo(ctx context.Context, resource *model.Resource) (*model.FileObject, error) {
-	return db.GetFile(ctx, resource.Repo.ID, resource.Path)
+	file, err := db.GetFile(ctx, resource.Repo.ID, resource.Path)
+	if err != nil {
+		return nil, err
+	}
+
+	if file.IsDir || file.MimeType != nil {
+		return file, nil
+	}
+
+	storage, err := getStorage(resource.Repo)
+	if err != nil {
+		return nil, err
+	}
+
+	if ct, err := storage.GetContentType(ctx, resource.Repo.Name, resource.Path); err == nil {
+		file.MimeType = &ct
+	} else {
+		log.Printf("Failed to get content type for %s: %s", resource.Path, err)
+	}
+
+	return file, nil
 }
 
 // ListDir lists the contents of a directory
@@ -162,13 +183,13 @@ func CreateDir(ctx context.Context, resource *model.Resource) error {
 // Storage defines the interface for file storage backends
 type Storage interface {
 	// PutFile uploads a file to the storage backend
-	PutFile(ctx context.Context, repo, name string, data io.Reader) error
+	PutFile(ctx context.Context, repo, name string, data io.Reader) (*FileMeta, error)
 	// OpenFile opens a file for reading from the storage backend
 	OpenFile(ctx context.Context, repo, name string) (io.ReadCloser, error)
 	// DeleteFile deletes a file from the storage backend
 	DeleteFile(ctx context.Context, repo, name string) error
 	// CopyFile copies a file within the storage backend
-	CopyFile(ctx context.Context, repo, srcName, destName string) error
+	CopyFile(ctx context.Context, repo, srcName, destName string) (*FileMeta, error)
 	// Scan scanes existing objects of storage.
 	Scan(ctx context.Context, repo string, visit func(*FileMeta) error) error
 	// GetContentType returns content type of file
@@ -199,7 +220,12 @@ func PutFile(ctx context.Context, res *model.Resource, dataReader io.Reader) err
 		return err
 	}
 
-	return storage.PutFile(ctx, res.Repo.Name, res.Path, dataReader)
+	meta, err := storage.PutFile(ctx, res.Repo.Name, res.Path, dataReader)
+	if err != nil {
+		return err
+	}
+
+	return updateFileMeta(ctx, res.Repo, meta)
 }
 
 // OpenFile opens a file for reading from the appropriate storage backend
@@ -233,7 +259,12 @@ func CopyFile(ctx context.Context, srcResource *model.Resource, destResource *mo
 		return err
 	}
 
-	return storage.CopyFile(ctx, srcResource.Repo.Name, srcResource.Path, destResource.Path)
+	meta, err := storage.CopyFile(ctx, srcResource.Repo.Name, srcResource.Path, destResource.Path)
+	if err != nil {
+		return err
+	}
+
+	return updateFileMeta(ctx, destResource.Repo, meta)
 }
 
 // MoveFile moves a file within the same repository in the appropriate storage backend
@@ -247,12 +278,20 @@ func MoveFile(ctx context.Context, srcResource *model.Resource, destResource *mo
 		return err
 	}
 
-	err = storage.CopyFile(ctx, srcResource.Repo.Name, srcResource.Path, destResource.Path)
+	meta, err := storage.CopyFile(ctx, srcResource.Repo.Name, srcResource.Path, destResource.Path)
 	if err != nil {
 		return err
 	}
 
-	return storage.DeleteFile(ctx, srcResource.Repo.Name, srcResource.Path)
+	if err = updateFileMeta(ctx, destResource.Repo, meta); err != nil {
+		return err
+	}
+
+	if err = storage.DeleteFile(ctx, srcResource.Repo.Name, srcResource.Path); err != nil {
+		return err
+	}
+
+	return db.DeleteFileByPath(ctx, srcResource.Repo.ID, srcResource.Path)
 }
 
 // ScanFiles scan existing files from storage location, and update metadata accordingly.
@@ -266,16 +305,21 @@ func ScanFiles(ctx context.Context, repo *model.Repository) error {
 		if fm.Path == "" {
 			return nil // skip repository root
 		}
-		dir := path.Dir(fm.Path)
-		if dir == "." || dir == "/" {
-			dir = ""
-		}
-		parent, err := db.GetFile(ctx, repo.ID, dir)
-		if err != nil {
-			return err
-		}
-
-		object := fm.toObject(repo.ID, repo.OwnerID, parent.ID)
-		return db.UpsertFile(ctx, object)
+		return updateFileMeta(ctx, repo, fm)
 	})
+}
+
+func updateFileMeta(ctx context.Context, repo *model.Repository, fm *FileMeta) error {
+	dir := path.Dir(fm.Path)
+	if dir == "." || dir == "/" {
+		dir = ""
+	}
+	parent, err := db.GetFile(ctx, repo.ID, dir)
+	if err != nil {
+		return fmt.Errorf("get %s failed: %s", dir, err)
+	}
+
+	object := fm.toObject(repo.ID, repo.OwnerID, parent.ID)
+	return db.UpsertFile(ctx, object)
+
 }

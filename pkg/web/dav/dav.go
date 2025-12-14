@@ -103,7 +103,7 @@ func getResource(c *gin.Context) (*model.Resource, error) {
 
 	return &model.Resource{
 		Repo: repo,
-		Path: strings.TrimPrefix(c.Param("path"), "/"),
+		Path: strings.TrimSuffix(c.Param("path"), "/"),
 	}, nil
 }
 
@@ -115,7 +115,7 @@ func getResourceByUrl(ctx context.Context, urlStr string) (*model.Resource, erro
 	}
 
 	// TODO fix hardcoded /dav path
-	subPath := strings.TrimPrefix(u.Path, "/dav")
+	subPath := strings.TrimPrefix(u.Path, "/dav/")
 	if base, name, ok := strings.Cut(subPath, "/"); ok {
 		r, err := stor.GetRepository(ctx, base)
 		if err != nil {

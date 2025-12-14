@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { listDirectory, uploadFile } from '../utils/webdav.js';
+  import { listDirectory, uploadFile, getDavPath } from '../utils/webdav.js';
   import FileCard from './FileCard.svelte';
   import NavigationBar from './NavigationBar.svelte';
   import UploadComponent from './UploadComponent.svelte';
@@ -13,9 +13,11 @@
   let breadcrumbs = [{ name: 'Home', path: '/' }];
   let viewMode = 'table'; // 'table' or 'grid'
   let scanning = false;
+  let davPath = '/dav';
 
   // Load the initial directory
   onMount(async () => {
+    davPath = await getDavPath();
     await loadDirectory(currentPath);
   });
 
@@ -59,11 +61,12 @@
   }
 
   // Function to handle file upload
-  async function handleFileUpload(file) {
+  async function handleFileUpload(event) {
     try {
-      await uploadFile(currentPath, file);
+      const { file, path } = event.detail;
+      await uploadFile(path, file);
       // Refresh the directory after upload
-      await loadDirectory(currentPath);
+      await loadDirectory(path);
     } catch (err) {
       error = `Upload failed: ${err.message}`;
     }
@@ -165,7 +168,7 @@
                 if (file.type === 'directory') {
                   loadDirectory(file.path);
                 } else {
-                  window.open('/dav' + file.path, '_blank');
+                  window.open(davPath + file.path, '_blank');
                 }
               }} style="cursor: pointer;">
                 <!-- Icon and name displayed directly in table cell -->

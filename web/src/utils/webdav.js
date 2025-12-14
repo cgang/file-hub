@@ -27,7 +27,7 @@ async function fetchDavPath() {
  * Get DAV path with caching
  * @returns {Promise<string>} The DAV base path
  */
-async function getDavPath() {
+export async function getDavPath() {
   return _davPath || fetchDavPath();
 }
 
@@ -95,29 +95,7 @@ const response = await fetch(`${davPath}${path}`, {
   for (let i = 0; i < responses.length; i++) {
     const response = responses[i];
     const href = response.getElementsByTagName('href')[0]?.textContent;
-
     if (!href) continue;
-
-    // Convert href to a relative path by removing the WebDAV URL prefix
-    let relativeHref = decodeURIComponent(href);
-    const davPath = await getDavPath();
-    if (relativeHref.startsWith(davPath)) {
-      relativeHref = relativeHref.substring(davPath.length);
-      // Ensure path starts with / after removing prefix
-      if (!relativeHref.startsWith('/')) {
-        relativeHref = '/' + relativeHref;
-      }
-    }
-    // Always ensure directory paths end with '/' (except root)
-    if (response.getElementsByTagName('iscollection')[0]?.textContent === '1' && relativeHref !== '/' && !relativeHref.endsWith('/')) {
-      relativeHref = relativeHref + '/';
-    }
-
-    // The path variable passed to this function is already the path relative to WebDAV root
-    // Skip the entry for the current directory itself
-    if (relativeHref === path || relativeHref === path + '/') {
-      continue;
-    }
 
     const propstat = response.getElementsByTagName('propstat')[0];
     if (!propstat) continue;
@@ -131,22 +109,32 @@ const response = await fetch(`${davPath}${path}`, {
     const lastModified = prop.getElementsByTagName('getlastmodified')[0]?.textContent;
     const isCollection = prop.getElementsByTagName('iscollection')[0]?.textContent === '1';
 
-    // Extract the actual name from the relative path
-    const hrefParts = relativeHref.split('/').filter(part => part !== '');
-    const currentPathParts = path.split('/').filter(part => part !== '');
+    // Convert href to a relative path by removing the WebDAV URL prefix
+    let relativeHref = decodeURIComponent(href);
+    const davPath = await getDavPath();
+    if (relativeHref.startsWith(davPath)) {
+      relativeHref = relativeHref.substring(davPath.length);
+      // Ensure path starts with / after removing prefix
+      if (!relativeHref.startsWith('/')) {
+        relativeHref = '/' + relativeHref;
+      }
+    }
+    // Always ensure directory paths end with '/' (except root)
+    if (isCollection && !relativeHref.endsWith('/')) {
+      relativeHref = relativeHref + '/';
+    }
 
-    let name;
-    if (hrefParts.length > currentPathParts.length) {
-      name = hrefParts[currentPathParts.length];
-    } else {
-      continue; // Skip if it's not a direct child
+    // The path variable passed to this function is already the path relative to WebDAV root
+    // Skip the entry for the current directory itself
+    if (relativeHref === path || relativeHref === path + '/') {
+      continue;
     }
 
     // Skip the parent directory indicator if present
-    if (name === '..') continue;
+    if (displayName === '..') continue;
 
     items.push({
-      name: displayName || name,
+      name: displayName,
       path: relativeHref,
       type: isCollection ? 'directory' : 'file',
       size: contentLength ? parseInt(contentLength) : undefined,
