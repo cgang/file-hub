@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/cgang/file-hub/pkg/db"
@@ -38,19 +39,22 @@ func Authenticate(ctx context.Context, username, password string) (*model.User, 
 		return nil, errors.New("invalid credentials")
 	}
 
+	updateLastLogin(context.Background(), user)
+
+	return user, nil
+}
+
+func updateLastLogin(ctx context.Context, user *model.User) {
 	// Update last login time
 	now := time.Now()
 	updateReq := &UpdateUserRequest{
 		LastLogin: &now,
 	}
 
-	err = Update(ctx, user.ID, updateReq)
+	err := Update(ctx, user.ID, updateReq)
 	if err != nil {
-		// Log error but don't fail authentication
-		// In a production system, you'd want to log this properly
+		log.Printf("Failed to update last login time: %s", err)
 	}
-
-	return user, nil
 }
 
 // ValidateDigest validates a user's credentials for digest authentication
@@ -71,17 +75,7 @@ func ValidateDigest(ctx context.Context, username, uri, nonce, nc, cnonce, qop, 
 		return nil, errors.New("invalid credentials")
 	}
 
-	// Update last login time
-	now := time.Now()
-	updateReq := &UpdateUserRequest{
-		LastLogin: &now,
-	}
-
-	err = Update(ctx, user.ID, updateReq)
-	if err != nil {
-		// Log error but don't fail authentication
-		// In a production system, you'd want to log this properly
-	}
+	updateLastLogin(context.Background(), user)
 
 	return user, nil
 }
