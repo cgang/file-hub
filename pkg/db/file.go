@@ -101,7 +101,7 @@ func GetFilesByUser(ctx context.Context, userID int) ([]*FileModel, error) {
 	var files []*FileModel
 	err := db.NewSelect().
 		Model(&files).
-		Where("user_id = ? AND deleted = ?", userID, false).
+		Where("owner_id = ? AND deleted = ?", userID, false).
 		Order("updated_at DESC").
 		Scan(ctx)
 
@@ -123,7 +123,7 @@ func GetFilesByUserAndPathPrefix(ctx context.Context, userID int, pathPrefix str
 	var files []*FileModel
 	err := db.NewSelect().
 		Model(&files).
-		Where("user_id = ? AND (path = ? OR path LIKE ?) AND deleted = ?", userID, pathPrefix, pathPrefix+"%", false).
+		Where("owner_id = ? AND (path = ? OR path LIKE ?) AND deleted = ?", userID, pathPrefix, pathPrefix+"%", false).
 		Order("path").
 		Scan(ctx)
 
@@ -210,11 +210,41 @@ func DeleteFile(ctx context.Context, id int) error {
 	return nil
 }
 
+// UpsertFile creates a new file or updates an existing file in the database
+// using PostgreSQL's UPSERT functionality based on repo_id and path
+func UpsertFile(ctx context.Context, file *model.FileObject) error {
+	// Ensure required fields are present
+	if file.RepoID == 0 || file.Path == "" {
+		return fmt.Errorf("repo_id and path are required for upsert")
+	}
+
+	// Set timestamps
+	now := time.Now()
+	if file.CreatedAt.IsZero() {
+		file.CreatedAt = now
+	}
+	file.UpdatedAt = now
+
+	// Use PostgreSQL 15+ MERGE command via bun's builder
+	_, err := db.NewInsert().Model(wrapFile(file)).
+		On("CONFLICT (repo_id, path) DO UPDATE").
+		Set("mod_time = ?", file.ModTime).
+		Set("size = ?", file.Size).
+		Set("updated_at = ?", now).
+		Exec(ctx)
+
+	if err != nil {
+		return fmt.Errorf("failed to upsert file: %w", err)
+	}
+
+	return nil
+}
+
 // DeleteFileByPath marks a file as deleted by path and user
 func DeleteFileByPath(ctx context.Context, path string, userID int) error {
 	result, err := db.NewDelete().
 		Model((*FileModel)(nil)).
-		Where("path = ? AND user_id = ?", path, userID).
+		Where("path = ? AND owner_id = ?", path, userID).
 		Exec(ctx)
 
 	if err != nil {

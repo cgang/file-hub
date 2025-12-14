@@ -81,7 +81,7 @@ func (s *fsStorage) Scan(ctx context.Context, repo string, visit func(*FileMeta)
 			return err
 		}
 
-		meta.LastModified = info.ModTime()
+		meta.ModTime = info.ModTime()
 		if !d.IsDir() {
 			meta.Size = info.Size()
 		}

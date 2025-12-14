@@ -36,6 +36,7 @@ type FileObject struct {
 	Path      string    `json:"path" bun:"path,notnull"`
 	MimeType  *string   `json:"mime_type,omitempty" bun:"mime_type"`
 	Size      int64     `json:"size" bun:"size,notnull"`
+	ModTime   time.Time `json:"mod_time" bun:"mod_time"`
 	Checksum  *string   `json:"checksum,omitempty" bun:"checksum"`
 	CreatedAt time.Time `json:"created_at" bun:"created_at,notnull"`
 	UpdatedAt time.Time `json:"updated_at" bun:"updated_at,notnull"`

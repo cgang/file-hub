@@ -9,11 +9,11 @@ CREATE TABLE users (
     ha1_hash VARCHAR(255) NOT NULL,  -- Store HA1 hash for digest auth (username:realm:password)
     first_name VARCHAR(255),
     last_name VARCHAR(255),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     last_login TIMESTAMP WITH TIME ZONE,
     is_active BOOLEAN DEFAULT TRUE,
-    is_admin BOOLEAN DEFAULT FALSE
+    is_admin BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Repositories table representing file repositories owned by users
@@ -36,11 +36,12 @@ CREATE TABLE files (
     path TEXT NOT NULL,          -- Full path including filename relative to repository root
     mime_type VARCHAR(255),
     size BIGINT NOT NULL DEFAULT 0,  -- File size in bytes
+    mod_time TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     checksum VARCHAR(64),            -- SHA-256 hash of file content
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     is_dir BOOLEAN NOT NULL DEFAULT FALSE,  -- True for directories, false for files
-    deleted BOOLEAN NOT NULL DEFAULT FALSE   -- Soft delete flag
+    deleted BOOLEAN NOT NULL DEFAULT FALSE,   -- Soft delete flag
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Shares table for sharing repository paths with other users
@@ -70,6 +71,7 @@ CREATE INDEX idx_files_owner_id ON files (owner_id);
 CREATE INDEX idx_files_repo_id ON files (repo_id);
 CREATE INDEX idx_files_path ON files (path);
 CREATE INDEX idx_files_parent_id ON files (parent_id);
+CREATE UNIQUE INDEX idx_files_repo_id_path ON files (repo_id, path);
 CREATE INDEX idx_shares_user_id ON shares (user_id);
 CREATE INDEX idx_shares_repo_id ON shares (repo_id);
 CREATE INDEX idx_user_quota_user_id ON user_quota (user_id);

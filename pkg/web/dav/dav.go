@@ -191,7 +191,7 @@ func createResponse(href string, file *model.FileObject) Response {
 	prop := Prop{
 		Name:         name,
 		DisplayName:  name,
-		LastModified: file.UpdatedAt.UTC().Format(time.RFC1123),
+		LastModified: file.ModTime.Format(time.RFC1123),
 		ContentType:  file.ContentType(),
 	}
 

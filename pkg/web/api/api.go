@@ -48,7 +48,7 @@ func ScanFiles(c *gin.Context) {
 		return
 	}
 
-	if err := stor.ImportFiles(c, repo); err != nil {
+	if err := stor.ScanFiles(c, repo); err != nil {
 		c.String(http.StatusInternalServerError, "Failed to sync files: %s", err)
 		return
 	}

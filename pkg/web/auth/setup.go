@@ -16,7 +16,7 @@ type SetupRequest struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
 	Email    string `json:"email" binding:"required,email"`
-	RootDir  string `json:"root_dir" binding:"required"`
+	Root     string `json:"root" binding:"required"`
 }
 
 // Setup handles the creation of the first user
@@ -28,13 +28,13 @@ func Setup(c *gin.Context) {
 	}
 
 	var req SetupRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.Bind(&req); err != nil {
 		c.String(http.StatusBadRequest, "Invalid request format")
 		return
 	}
 
-	if !stor.ValidRoot(req.RootDir) {
-		c.String(http.StatusBadRequest, "Invalid root dir: %s", req.RootDir)
+	if !stor.ValidRoot(req.Root) {
+		c.String(http.StatusBadRequest, "Invalid root dir: %s", req.Root)
 		return
 	}
 
@@ -53,7 +53,7 @@ func Setup(c *gin.Context) {
 		return
 	}
 
-	if err := stor.CreateHomeRepo(c, user, req.RootDir); err != nil {
+	if err := stor.CreateHomeRepo(c, user, req.Root); err != nil {
 		c.String(http.StatusInternalServerError, "Failed to create home repository for %s: %s", req.Username, err)
 		return
 	}

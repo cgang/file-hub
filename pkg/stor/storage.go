@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -19,40 +18,40 @@ import (
 )
 
 type FileMeta struct {
-	Name         string
-	Path         string
-	IsDir        bool
-	Size         int64
-	LastModified time.Time
+	Name    string
+	Path    string
+	IsDir   bool
+	Size    int64
+	ModTime time.Time
 }
 
 func newFileMeta(fullname string, mt time.Time) *FileMeta {
 	return &FileMeta{
-		Name:         path.Base(fullname),
-		Path:         fullname,
-		LastModified: mt,
+		Name:    path.Base(fullname),
+		Path:    fullname,
+		ModTime: mt,
 	}
 }
 
 func newDirMeta(fullname string, mt time.Time) *FileMeta {
 	return &FileMeta{
-		Name:         path.Base(fullname),
-		Path:         fullname,
-		IsDir:        true,
-		LastModified: mt,
+		Name:    path.Base(fullname),
+		Path:    fullname,
+		IsDir:   true,
+		ModTime: mt,
 	}
 }
 
 func (m *FileMeta) toObject(repoID, ownerID, parentID int) *model.FileObject {
 	return &model.FileObject{
-		RepoID:    repoID,
-		OwnerID:   ownerID,
-		ParentID:  parentID,
-		Name:      m.Name,
-		Path:      m.Path,
-		Size:      m.Size,
-		IsDir:     m.IsDir,
-		UpdatedAt: m.LastModified,
+		RepoID:   repoID,
+		OwnerID:  ownerID,
+		ParentID: parentID,
+		Name:     m.Name,
+		Path:     m.Path,
+		Size:     m.Size,
+		ModTime:  m.ModTime,
+		IsDir:    m.IsDir,
 	}
 }
 
@@ -74,7 +73,7 @@ func IsNotFound(err error) bool {
 
 func isConfiguredRoot(root string) bool {
 	for _, dir := range rootDirs {
-		if t := strings.TrimPrefix(root, dir); t != root && strings.HasPrefix(t, "/") {
+		if root == dir {
 			return true
 		}
 	}
@@ -256,8 +255,8 @@ func MoveFile(ctx context.Context, srcResource *model.Resource, destResource *mo
 	return storage.DeleteFile(ctx, srcResource.Repo.Name, srcResource.Path)
 }
 
-// ImportFiles imports existing files from storage location.
-func ImportFiles(ctx context.Context, repo *model.Repository) error {
+// ScanFiles scan existing files from storage location, and update metadata accordingly.
+func ScanFiles(ctx context.Context, repo *model.Repository) error {
 	storage, err := getStorage(repo)
 	if err != nil {
 		return err
@@ -277,6 +276,6 @@ func ImportFiles(ctx context.Context, repo *model.Repository) error {
 		}
 
 		object := fm.toObject(repo.ID, repo.OwnerID, parent.ID)
-		return db.CreateFile(ctx, object)
+		return db.UpsertFile(ctx, object)
 	})
 }

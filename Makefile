@@ -10,25 +10,6 @@ $(BINARY): $(GOFILES) $(JSFILES)
 
 build: $(BINARY)
 
-run: build
-	CONFIG_PATH=example ./$(BINARY)
-
-migrate:
-	psql -d filehub -f scripts/database_schema.sql
-
-# Web UI targets
-web-dev:
-	cd web && npm run dev
-
-web-build:
-	cd web && npm run build
-
-web-install:
-	cd web && npm install
-
-web-serve:
-	cd web && npm run preview
-
 golint:
 	golangci-lint run
 
@@ -41,4 +22,4 @@ clean:
 
 all: build
 
-.PHONY: web-dev web-build web-install web-serve clean all run
+.PHONY: clean all

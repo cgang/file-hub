@@ -9,8 +9,9 @@ import (
 
 func CreateHomeRepo(ctx context.Context, user *model.User, rootDir string) error {
 	repo := &model.Repository{
-		Name: user.Username,
-		Root: rootDir,
+		Name:    user.Username,
+		OwnerID: user.ID,
+		Root:    rootDir,
 	}
 
 	if err := db.CreateRepository(ctx, repo); err != nil {
