@@ -53,7 +53,8 @@ async function handleHttpError(response, prefix) {
   try {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(text, 'application/xml');
-    const errorElement = xmlDoc.getElementsByTagName('error')[0];
+    const davNS = 'DAV:';
+    const errorElement = xmlDoc.getElementsByTagNameNS(davNS, 'error')[0];
     if (errorElement) {
       errorText = errorElement.textContent || text;
     }
@@ -88,26 +89,31 @@ const response = await fetch(`${davPath}${path}`, {
   const parser = new DOMParser();
   const xmlDoc = parser.parseFromString(responseText, 'application/xml');
 
+  // Define the DAV namespace URI
+  const davNS = 'DAV:';
+
   // Extract file and directory information
-  const responses = xmlDoc.getElementsByTagName('response');
+  const responses = xmlDoc.getElementsByTagNameNS(davNS, 'response');
   const items = [];
 
   for (let i = 0; i < responses.length; i++) {
     const response = responses[i];
-    const href = response.getElementsByTagName('href')[0]?.textContent;
+    const href = response.getElementsByTagNameNS(davNS, 'href')[0]?.textContent;
     if (!href) continue;
 
-    const propstat = response.getElementsByTagName('propstat')[0];
+    const propstat = response.getElementsByTagNameNS(davNS, 'propstat')[0];
     if (!propstat) continue;
 
-    const prop = propstat.getElementsByTagName('prop')[0];
+    const prop = propstat.getElementsByTagNameNS(davNS, 'prop')[0];
     if (!prop) continue;
 
-    const displayName = prop.getElementsByTagName('displayname')[0]?.textContent || '';
-    const contentType = prop.getElementsByTagName('getcontenttype')[0]?.textContent;
-    const contentLength = prop.getElementsByTagName('getcontentlength')[0]?.textContent;
-    const lastModified = prop.getElementsByTagName('getlastmodified')[0]?.textContent;
-    const isCollection = prop.getElementsByTagName('iscollection')[0]?.textContent === '1';
+    const displayName = prop.getElementsByTagNameNS(davNS, 'displayname')[0]?.textContent || '';
+    const contentType = prop.getElementsByTagNameNS(davNS, 'getcontenttype')[0]?.textContent;
+    const contentLength = prop.getElementsByTagNameNS(davNS, 'getcontentlength')[0]?.textContent;
+    const lastModified = prop.getElementsByTagNameNS(davNS, 'getlastmodified')[0]?.textContent;
+    // Check if this is a collection by looking for the resourcetype element
+    const resourceType = prop.getElementsByTagNameNS(davNS, 'resourcetype')[0];
+    const isCollection = resourceType && resourceType.getElementsByTagNameNS(davNS, 'collection').length > 0;
 
     // Convert href to a relative path by removing the WebDAV URL prefix
     let relativeHref = decodeURIComponent(href);

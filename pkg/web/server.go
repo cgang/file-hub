@@ -58,11 +58,7 @@ func Start(ctx context.Context, cfg *config.Config) {
 	}
 
 	api.Register(engine.Group("/api"))
-
-	// Register WebDAV with authentication middleware
-	webdav := engine.Group("/dav")
-	webdav.Use(auth.Authenticate)
-	dav.Register(webdav)
+	dav.Register(engine.Group("/dav"))
 
 	engine.StaticFS("/ui", uiFiles)
 	engine.GET("/", defaultRoute)

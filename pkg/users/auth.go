@@ -62,6 +62,7 @@ func ValidateDigest(ctx context.Context, username, uri, nonce, nc, cnonce, qop, 
 	// Get user by username
 	user, err := db.GetUserByUsername(ctx, username)
 	if err != nil {
+		log.Printf("Failed to get user: %s", err)
 		return nil, errors.New("invalid credentials")
 	}
 
@@ -72,6 +73,7 @@ func ValidateDigest(ctx context.Context, username, uri, nonce, nc, cnonce, qop, 
 	expectedResponse := ComputeMD5("%s:%s:%s:%s:%s:%s", user.HA1, nonce, nc, cnonce, qop, ha2)
 	// Compare responses using constant time comparison
 	if response != expectedResponse {
+		log.Printf("Invalid response, expected: %s, got: %s", expectedResponse, response)
 		return nil, errors.New("invalid credentials")
 	}
 

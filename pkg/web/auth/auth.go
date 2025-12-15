@@ -49,7 +49,7 @@ func Authenticate(c *gin.Context) {
 		}
 
 		// Also support basic auth
-		c.Header("WWW-Authenticate", `Basic realm="`+userRealm+`"`)
+		// c.Header("WWW-Authenticate", `Basic realm="`+userRealm+`"`)
 		c.Header("WWW-Authenticate", generateWWWAuthenticateHeader(challenge))
 		c.String(http.StatusUnauthorized, "No authorization provided")
 		c.Abort()
@@ -63,11 +63,12 @@ func Authenticate(c *gin.Context) {
 		return
 	}
 
+	log.Printf("Authentication provided: %s %s", kind, creds)
 	switch kind {
 	case "Basic":
 		handleBasicAuth(c, creds, userRealm)
 	case "Digest":
-		handleDigestAuth(c, authStr, nonceStore, userRealm)
+		handleDigestAuth(c, creds, nonceStore, userRealm)
 	default:
 		c.String(http.StatusBadRequest, "Unsupported authorization method")
 		c.Abort()

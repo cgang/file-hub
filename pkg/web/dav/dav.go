@@ -1,6 +1,7 @@
 package dav
 
 import (
+	"bytes"
 	"context"
 	"encoding/xml"
 	"fmt"
@@ -15,12 +16,38 @@ import (
 
 	"github.com/cgang/file-hub/pkg/model"
 	"github.com/cgang/file-hub/pkg/stor"
+	"github.com/cgang/file-hub/pkg/web/auth"
 	"github.com/gin-gonic/gin"
 )
 
+const (
+	davNamespace = "DAV:"
+)
+
+// PropfindRequest represents the XML request body for PROPFIND
+type PropfindRequest struct {
+	XMLName  xml.Name      `xml:"DAV: propfind"`
+	AllProp  *struct{}     `xml:"DAV: allprop,omitempty"`
+	PropName *struct{}     `xml:"DAV: propname,omitempty"`
+	Prop     *PropfindProp `xml:"DAV: prop,omitempty"`
+}
+
+// PropfindProp represents the prop element in PROPFIND request
+type PropfindProp struct {
+	DisplayName   *struct{} `xml:"DAV: displayname,omitempty"`
+	ResourceType  *struct{} `xml:"DAV: resourcetype,omitempty"`
+	ContentType   *struct{} `xml:"DAV: getcontenttype,omitempty"`
+	ContentLength *struct{} `xml:"DAV: getcontentlength,omitempty"`
+	LastModified  *struct{} `xml:"DAV: getlastmodified,omitempty"`
+	CreationDate  *struct{} `xml:"DAV: creationdate,omitempty"`
+	ETag          *struct{} `xml:"DAV: getetag,omitempty"`
+	// Add more properties as needed
+}
+
 func setDavHeaders(c *gin.Context) {
 	c.Header("DAV", "1")
-	c.Header("Content-Type", "application/xml; charset=utf-8")
+	c.Header("MS-Author-Via", "DAV")
+	//c.Header("Content-Type", "text/xml; charset=utf-8")
 }
 
 // getAuthenticatedUser retrieves the authenticated user from the context
@@ -43,6 +70,10 @@ func Register(v1 *gin.RouterGroup) {
 	// Note: Authentication should be handled by a middleware in the calling code
 	v1.Use(setDavHeaders)
 
+	v1.OPTIONS("/:repo/*path", handleOptions)
+
+	v1.Use(auth.Authenticate)
+
 	v1.PUT("/:repo/*path", handlePut)
 	v1.DELETE("/:repo/*path", handleDelete)
 	v1.GET("/:repo/*path", handleGet)
@@ -53,35 +84,44 @@ func Register(v1 *gin.RouterGroup) {
 	v1.Handle("MOVE", "/:repo/*path", handleCopyMove)
 }
 
-// XML structures for WebDAV
-type Propfind struct {
-	XMLName xml.Name `xml:"DAV: propfind"`
-	Prop    Prop     `xml:"prop"`
+type Prop struct {
+	DisplayName  string        `xml:"D:displayname"`
+	ResourceType *ResourceType `xml:"D:resourcetype,omitempty"`
+	ContentType  string        `xml:"D:getcontenttype"`
+	Length       string        `xml:"D:getcontentlength,omitempty"`
+	LastModified string        `xml:"D:getlastmodified"`
+	CreationDate string        `xml:"D:creationdate,omitempty"`
+	ETag         string        `xml:"D:getetag,omitempty"`
 }
 
-type Prop struct {
-	Name         string `xml:"name"`
-	DisplayName  string `xml:"displayname"`
-	IsCollection string `xml:"iscollection"`
-	ContentType  string `xml:"getcontenttype"`
-	Length       string `xml:"getcontentlength"`
-	LastModified string `xml:"getlastmodified"`
+type ResourceType struct {
+	XmlData string `xml:",innerxml"`
+}
+
+func CollectionType() *ResourceType {
+	return &ResourceType{XmlData: "<D:collection/>"}
 }
 
 type Multistatus struct {
-	XMLName  xml.Name   `xml:"multistatus"`
-	Response []Response `xml:"response"`
+	XMLName  xml.Name   `xml:"D:multistatus"`
+	DavNS    string     `xml:"xmlns:D,attr"`
+	Response []Response `xml:"D:response"`
 }
 
 type Response struct {
-	Href   string `xml:"href"`
-	Prop   Prop   `xml:"propstat>prop"`
-	Status string `xml:"status"`
+	Href     string   `xml:"D:href"`
+	Propstat Propstat `xml:"D:propstat"`
+}
+
+type Propstat struct {
+	Prop   Prop   `xml:"D:prop"`
+	Status string `xml:"D:status"`
 }
 
 // ErrorBody is used for WebDAV error responses
 type ErrorBody struct {
-	XMLName xml.Name `xml:"error"`
+	XMLName xml.Name `xml:"D:error"`
+	DavNS   string   `xml:"xmlns:dav,attr"`
 	Message string   `xml:",innerxml"`
 }
 
@@ -89,6 +129,7 @@ type ErrorBody struct {
 func sendError(c *gin.Context, status int, format string, a ...any) {
 	c.XML(status, &ErrorBody{
 		XMLName: xml.Name{Space: "DAV", Local: "error"},
+		DavNS:   davNamespace,
 		Message: fmt.Sprintf(format, a...),
 	})
 }
@@ -114,18 +155,24 @@ func getResourceByUrl(ctx context.Context, urlStr string) (*model.Resource, erro
 		return nil, fmt.Errorf("invalid URL: %w", err)
 	}
 
-	// TODO fix hardcoded /dav path
-	subPath := strings.TrimPrefix(u.Path, "/dav/")
-	if base, name, ok := strings.Cut(subPath, "/"); ok {
-		r, err := stor.GetRepository(ctx, base)
-		if err != nil {
-			return nil, err
-		}
+	// Extract the path and remove the leading slash
+	path := strings.TrimPrefix(u.Path, "/")
 
-		return &model.Resource{Repo: r, Path: name}, nil
-	} else {
-		return nil, fmt.Errorf("invalid path: %s", subPath)
+	// Split the path to get repo and file path
+	parts := strings.SplitN(path, "/", 2)
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("invalid path: %s", path)
 	}
+
+	base := parts[0]
+	name := parts[1]
+
+	r, err := stor.GetRepository(ctx, base)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.Resource{Repo: r, Path: name}, nil
 }
 
 // handlePropfind handles PROPFIND requests
@@ -142,8 +189,32 @@ func handlePropfind(c *gin.Context) {
 		return
 	}
 
+	// Parse the PROPFIND request using c.Bind
+	propfindReq := &PropfindRequest{}
+	if c.Request.ContentLength > 0 {
+		if err := c.Bind(propfindReq); err != nil {
+			sendError(c, http.StatusBadRequest, "Failed to parse XML: %v", err)
+			return
+		}
+	} else {
+		// If no body, default to allprop as per RFC
+		propfindReq.AllProp = &struct{}{}
+	}
+
+	// Handle Depth header
+	depth := c.GetHeader("Depth")
+
+	// We only support Depth: 0 and Depth: 1
+	switch depth {
+	case "0", "1":
+		// Valid depth values, continue processing
+	default:
+		sendError(c, http.StatusForbidden, "Depth %s is not supported", depth)
+		return
+	}
+
 	// Log request
-	log.Printf("Handling PROPFIND request for %s", resource)
+	log.Printf("Handling PROPFIND request for %s with depth %s", resource, depth)
 
 	if err := stor.CheckPermission(c, user.ID, resource, stor.PermissionRead); err != nil {
 		log.Printf("Permission denied for %s: %v", resource, err)
@@ -152,7 +223,7 @@ func handlePropfind(c *gin.Context) {
 	}
 
 	// Build response
-	var ms Multistatus
+	ms := &Multistatus{DavNS: davNamespace}
 
 	// Get file info using storage abstraction
 	file, err := stor.GetFileInfo(c, resource)
@@ -168,44 +239,117 @@ func handlePropfind(c *gin.Context) {
 	}
 
 	// Add the file/directory itself
-	ms.Response = append(ms.Response, createResponse(c.Request.URL.Path, file))
-	// If it's a directory, list its contents
-	files, err := stor.ListDir(c, resource.Repo, file)
-	if err != nil {
-		log.Printf("Error reading directory %s: %v", resource, err)
-		sendError(c, http.StatusInternalServerError, "Failed to read directory: %v", err)
-		return
+	ms.Response = append(ms.Response, CreateResponse(c.Request.URL.Path, file, propfindReq))
+
+	// If depth is 1 and it's a directory, list its contents
+	if depth == "1" && file.IsDir {
+		files, err := stor.ListDir(c, resource.Repo, file)
+		if err != nil {
+			log.Printf("Error reading directory %s: %v", resource, err)
+			sendError(c, http.StatusInternalServerError, "Failed to read directory: %v", err)
+			return
+		}
+
+		for _, entry := range files {
+			// Construct proper href for each entry
+			entryHref := path.Join(c.Request.URL.Path, path.Base(entry.Path))
+			if entry.IsDir && !strings.HasSuffix(entryHref, "/") {
+				entryHref += "/"
+			}
+			ms.Response = append(ms.Response, CreateResponse(entryHref, entry, propfindReq))
+		}
 	}
 
-	for _, entry := range files {
-		entryUrlPath := strings.TrimSuffix(c.Request.URL.Path, "/") + entry.Path
-		ms.Response = append(ms.Response, createResponse(entryUrlPath, entry))
-	}
-
-	c.XML(http.StatusOK, &ms)
+	XML(c, http.StatusMultiStatus, ms)
 }
 
-// createResponse creates a WebDAV response with proper properties
-func createResponse(href string, file *model.FileObject) Response {
-	name := path.Base(file.Path)
-	prop := Prop{
-		Name:         name,
-		DisplayName:  name,
-		LastModified: file.ModTime.Format(time.RFC1123),
-		ContentType:  file.ContentType(),
+func XML(c *gin.Context, code int, body any) {
+	var buf bytes.Buffer
+	fmt.Fprint(&buf, xml.Header)
+	if err := xml.NewEncoder(&buf).Encode(body); err != nil {
+		log.Printf("Failed to encode XML: %s", err)
 	}
 
-	if file.IsDir {
-		prop.IsCollection = "1"
-	} else {
-		prop.IsCollection = "0"
-		prop.Length = fmt.Sprintf("%d", file.Size)
+	c.Data(code, "text/xml; charset=utf-8", buf.Bytes())
+}
+
+// CreateResponse creates a WebDAV response with proper properties (exported for testing)
+func CreateResponse(href string, file *model.FileObject, req *PropfindRequest) Response {
+	name := path.Base(file.Path)
+	if name == "." || name == "/" {
+		name = ""
 	}
+
+	prop := Prop{}
+
+	// Determine which properties to include based on the request
+	if req.PropName != nil {
+		// For propname requests, we only return the property names, not values
+		// We'll handle this by sending an empty multistatus response with status 200
+		// and another propstat with status 404 for properties not found
+		// For simplicity, we'll just return an empty prop
+	} else if req.AllProp != nil || req.Prop == nil {
+		// allprop request or no specific properties requested
+		prop.DisplayName = name
+		prop.LastModified = file.ModTime.UTC().Format(time.RFC1123)
+		prop.CreationDate = file.ModTime.Format(time.RFC3339)
+
+		if file.IsDir {
+			// For directories, specify the resourcetype as collection
+			prop.ResourceType = CollectionType()
+			prop.ContentType = "httpd/unix-directory"
+			if !strings.HasSuffix(href, "/") {
+				href = href + "/"
+			}
+		} else {
+			// For files, leave resourcetype empty and specify content type and length
+			prop.ResourceType = nil
+			prop.ContentType = file.ContentType()
+			prop.Length = fmt.Sprintf("%d", file.Size)
+			// Generate a simple etag based on modtime and size
+			prop.ETag = fmt.Sprintf("%x-%x", file.ModTime.Unix(), file.Size)
+		}
+	} else {
+		// Specific properties requested
+		if req.Prop.DisplayName != nil {
+			prop.DisplayName = name
+		}
+		if req.Prop.LastModified != nil {
+			prop.LastModified = file.ModTime.UTC().Format(time.RFC1123)
+		}
+		if req.Prop.CreationDate != nil {
+			prop.CreationDate = file.ModTime.Format(time.RFC3339)
+		}
+		if req.Prop.ResourceType != nil {
+			if file.IsDir {
+				prop.ResourceType = CollectionType()
+			} else {
+				prop.ResourceType = nil
+			}
+		}
+		if req.Prop.ContentType != nil {
+			if file.IsDir {
+				prop.ContentType = "httpd/unix-directory"
+			} else {
+				prop.ContentType = file.ContentType()
+			}
+		}
+		if req.Prop.ContentLength != nil && !file.IsDir {
+			prop.Length = fmt.Sprintf("%d", file.Size)
+		}
+		if req.Prop.ETag != nil && !file.IsDir {
+			prop.ETag = fmt.Sprintf("%x-%x", file.ModTime.Unix(), file.Size)
+		}
+	}
+
+	u := &url.URL{Path: href}
 
 	return Response{
-		Href:   href,
-		Prop:   prop,
-		Status: "HTTP/1.1 200 OK",
+		Href: u.EscapedPath(),
+		Propstat: Propstat{
+			Prop:   prop,
+			Status: "HTTP/1.1 200 OK",
+		},
 	}
 }
 
@@ -307,7 +451,7 @@ func handleCopyMove(c *gin.Context) {
 
 	// Parse destination path
 	destination := c.Request.Header.Get("Destination")
-	destRes, err := getResourceByUrl(c, destination)
+	destRes, err := getResourceByUrl(c.Request.Context(), destination)
 	if err != nil {
 		sendError(c, http.StatusBadRequest, "Invalid destination: %s", err)
 		return
@@ -389,4 +533,9 @@ func handleGet(c *gin.Context) {
 	if _, err := io.Copy(c.Writer, file); err != nil {
 		log.Printf("Failed to copy file content: %s", err)
 	}
+}
+
+func handleOptions(c *gin.Context) {
+	c.Header("Allow", "OPTIONS,GET,POST,PUT,DELETE,COPY,MOVE,PROPFIND,MKCOL,LOCK,UNLOCK")
+	c.Status(http.StatusOK)
 }

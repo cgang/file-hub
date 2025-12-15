@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -79,23 +80,18 @@ func createDigestChallenge(realm string) (*DigestChallenge, error) {
 }
 
 // parseDigestAuth parses the digest authentication header
-func parseDigestAuth(authStr string) (*DigestResponse, error) {
-	if !strings.HasPrefix(authStr, "Digest ") {
-		return nil, fmt.Errorf("not a digest auth header")
-	}
-
-	digestStr := strings.TrimPrefix(authStr, "Digest ")
-	params := strings.Split(digestStr, ", ")
+func parseDigestAuth(creds string) (*DigestResponse, error) {
+	params := strings.Split(creds, ",")
 
 	response := &DigestResponse{}
 	for _, param := range params {
-		kv := strings.SplitN(param, "=", 2)
-		if len(kv) != 2 {
+		key, value, ok := strings.Cut(param, "=")
+		if !ok {
 			continue
 		}
 
-		key := strings.TrimSpace(kv[0])
-		value := strings.Trim(strings.TrimSpace(kv[1]), "\"")
+		key = strings.TrimSpace(key)
+		value = strings.Trim(strings.TrimSpace(value), "\"")
 
 		switch key {
 		case "username":
@@ -164,8 +160,8 @@ func generateWWWAuthenticateHeader(challenge *DigestChallenge) string {
 }
 
 // handleDigestAuth handles digest authentication
-func handleDigestAuth(c *gin.Context, authStr string, nonceStore *NonceStore, realm string) {
-	digest, err := parseDigestAuth(authStr)
+func handleDigestAuth(c *gin.Context, creds string, nonceStore *NonceStore, realm string) {
+	digest, err := parseDigestAuth(creds)
 	if err != nil {
 		c.String(http.StatusBadRequest, "Invalid digest authorization format")
 		c.Abort()
@@ -191,6 +187,7 @@ func handleDigestAuth(c *gin.Context, authStr string, nonceStore *NonceStore, re
 		c.Request.Method,
 	)
 	if err != nil {
+		log.Printf("Failed to validate digest credentials: %s", err)
 		// Create a new challenge
 		challenge, err := createDigestChallenge(realm)
 		if err != nil {

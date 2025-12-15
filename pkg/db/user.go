@@ -79,9 +79,9 @@ func GetUserByUsername(ctx context.Context, username string) (*model.User, error
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("user not found")
+			return nil, fmt.Errorf("user not found: %s", username)
 		}
-		return nil, fmt.Errorf("failed to get user: %w", err)
+		return nil, fmt.Errorf("get user %s failed: %w", username, err)
 	}
 
 	return user.User, nil
