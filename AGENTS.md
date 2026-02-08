@@ -206,6 +206,13 @@ These conventions apply across all technologies and components in the project:
 - Add a blank line followed by a detailed description only when necessary
 - Add `Co-authored-by:` lines in the commit message body to acknowledge all AI agents and assistants involved.
 
+#### 7. Compatibility Considerations Pre-v1.0.0
+- Ignore backward compatibility concerns before formal v1.0.0 release
+- This project is under active development with no real users yet
+- Breaking changes are acceptable during pre-release development
+- Focus on improving functionality and architecture rather than maintaining compatibility
+- Major API, database schema, and configuration changes can be made freely until v1.0.0
+
 ### Language-Specific Patterns
 
 #### Go Patterns
