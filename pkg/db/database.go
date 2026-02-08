@@ -28,3 +28,7 @@ func Close() error {
 
 	return db.Close()
 }
+
+func GetDB() *bun.DB {
+	return db
+}

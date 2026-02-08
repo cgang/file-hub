@@ -60,3 +60,12 @@ func ListRepositories(ctx context.Context, userID int) ([]*model.Repository, err
 
 	return unwrapReposes(mos), nil
 }
+
+func GetRepositoryByNameAndOwner(ctx context.Context, name string, userID int) (*model.Repository, error) {
+	var mo ReposModel
+	err := db.NewSelect().Model(&mo).Where("name = ? AND owner_id = ?", name, userID).Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return mo.Repository, nil
+}

@@ -8,10 +8,12 @@ import (
 	"net/http"
 
 	"github.com/cgang/file-hub/pkg/config"
+	"github.com/cgang/file-hub/pkg/db"
 	"github.com/cgang/file-hub/pkg/users"
 	"github.com/cgang/file-hub/pkg/web/api"
 	"github.com/cgang/file-hub/pkg/web/auth"
 	"github.com/cgang/file-hub/pkg/web/dav"
+	"github.com/cgang/file-hub/pkg/web/handlers"
 	"github.com/cgang/file-hub/web"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
@@ -59,6 +61,7 @@ func Start(ctx context.Context, cfg *config.Config) {
 
 	api.Register(engine.Group("/api"))
 	dav.Register(engine.Group("/dav"))
+	handlers.RegisterSyncRoutes(engine, db.GetDB())
 
 	engine.StaticFS("/ui", uiFiles)
 	engine.GET("/", defaultRoute)

@@ -7,3 +7,4 @@ This directory contains documentation for the File Hub project.
 - `CONTRIBUTING.md` - Contribution guidelines
 - `TODOs.md` - Project TODO list and implementation plan
 - `REQUIREMENTS.md` - Project requirements and specifications
+- `SYNC_IMPLEMENTATION.md` - Sync protocol implementation guide (complete)
