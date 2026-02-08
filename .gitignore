@@ -44,3 +44,6 @@ web/.vite/
 
 # Cline AI Assistant files
 *.cline
+
+# Generated protobuf files
+*.pb.go

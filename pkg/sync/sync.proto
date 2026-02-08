@@ -1,0 +1,334 @@
+syntax = "proto3";
+
+package filehub.sync;
+
+option go_package = "github.com/cgang/file-hub/pkg/sync";
+
+// SyncService defines the API for file synchronization
+service SyncService {
+  // Upload a file to the server (for small files)
+  rpc UploadFile(UploadFileRequest) returns (UploadFileResponse);
+
+  // Chunked upload operations (for large files or unstable connections)
+  rpc BeginUpload(BeginUploadRequest) returns (BeginUploadResponse);
+  rpc UploadChunk(UploadChunkRequest) returns (UploadChunkResponse);
+  rpc FinalizeUpload(FinalizeUploadRequest) returns (FinalizeUploadResponse);
+  rpc CancelUpload(CancelUploadRequest) returns (CancelUploadResponse);
+
+  // Download a file from the server
+  rpc DownloadFile(DownloadFileRequest) returns (stream DownloadFileResponse);
+
+  // Get file metadata
+  rpc GetFileInfo(GetFileInfoRequest) returns (GetFileInfoResponse);
+
+  // List directory contents
+  rpc ListDirectory(ListDirectoryRequest) returns (ListDirectoryResponse);
+
+  // Get changes since a specific version
+  rpc ListChanges(ListChangesRequest) returns (ListChangesResponse);
+
+  // Get current version identifier
+  rpc GetCurrentVersion(GetCurrentVersionRequest) returns (GetCurrentVersionResponse);
+
+  // Create a directory
+  rpc CreateDirectory(CreateDirectoryRequest) returns (CreateDirectoryResponse);
+
+  // Delete a file or directory
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+
+  // Move/rename a file or directory
+  rpc Move(MoveRequest) returns (MoveResponse);
+
+  // Copy a file or directory
+  rpc Copy(CopyRequest) returns (CopyResponse);
+
+  // Get sync status for a path
+  rpc GetSyncStatus(SyncStatusRequest) returns (SyncStatusResponse);
+
+  // Batch operations for efficiency
+  rpc BatchOperation(BatchOperationRequest) returns (BatchOperationResponse);
+}
+
+// Common types
+message FileInfo {
+  string path = 1;
+  int64 size = 2;
+  int64 mod_time = 3;  // Unix timestamp
+  bool is_dir = 4;
+  string mime_type = 5;
+  string etag = 6;     // Content hash for change detection
+  int64 version = 7;   // Version number for conflict resolution
+}
+
+message Repository {
+  string name = 1;
+  string owner = 2;
+  string root_path = 3;
+}
+
+// Version tracking messages
+message GetCurrentVersionRequest {
+  string repo = 1;
+  string path = 2;  // Directory path to get version for
+}
+
+message GetCurrentVersionResponse {
+  bool success = 1;
+  string version = 2;  // Unique identifier for current state
+  int64 timestamp = 3; // Time when version was created
+  string error_message = 4;
+}
+
+// Change tracking messages
+message ListChangesRequest {
+  string repo = 1;
+  string path = 2;           // Directory path to sync
+  string since_version = 3;  // Client's last synced version
+  int32 max_changes = 4;     // Maximum number of changes to return (pagination)
+  string continuation_token = 5; // Token for pagination of large change sets
+}
+
+message ListChangesResponse {
+  bool success = 1;
+  string current_version = 2; // Current server version
+  bool version_expired = 3;   // True if since_version is too old and expired
+  repeated FileInfo created = 4;      // Newly created files/directories
+  repeated FileInfo modified = 5;     // Modified files/directories
+  repeated string deleted = 6;        // Deleted file/directory paths
+  repeated RenameOperation renamed = 7; // Renamed files/directories
+  bool has_more = 8;                  // Whether more changes are available
+  string continuation_token = 9;      // Token for getting next page of changes
+  string error_message = 10;
+}
+
+message RenameOperation {
+  string old_path = 1;
+  string new_path = 2;
+}
+
+// Chunked upload messages
+message BeginUploadRequest {
+  string repo = 1;
+  string path = 2;
+  int64 total_size = 3;
+  int64 mod_time = 4;
+  string mime_type = 5;
+  string upload_id = 6;  // Client-generated UUID for resumability
+}
+
+message BeginUploadResponse {
+  bool success = 1;
+  string upload_id = 2;  // Server-confirmed upload ID
+  repeated int32 uploaded_chunks = 3;  // Already uploaded chunks (for resume)
+  string error_message = 4;
+}
+
+message UploadChunkRequest {
+  string upload_id = 1;  // Matches the ID from BeginUpload
+  int32 chunk_index = 2; // Zero-based chunk index
+  bytes data = 3;        // Chunk data
+  int64 offset = 4;      // Byte offset in the original file (optional)
+}
+
+message UploadChunkResponse {
+  bool success = 1;
+  int32 chunk_index = 2;
+  string error_message = 3;
+}
+
+message FinalizeUploadRequest {
+  string upload_id = 1;
+  string expected_etag = 2;  // Client-computed hash for verification
+}
+
+message FinalizeUploadResponse {
+  bool success = 1;
+  string etag = 2;  // Server-computed hash
+  int64 version = 3;
+  string error_message = 4;
+}
+
+message CancelUploadRequest {
+  string upload_id = 1;
+}
+
+message CancelUploadResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+// Regular upload (for small files)
+message UploadFileRequest {
+  string repo = 1;
+  string path = 2;
+  bytes content = 3;
+  int64 size = 4;
+  int64 mod_time = 5;
+  string mime_type = 6;
+  string etag = 7;  // Client-computed hash for verification
+}
+
+message UploadFileResponse {
+  bool success = 1;
+  string etag = 2;  // Server-computed hash
+  int64 version = 3;
+  string error_message = 4;
+}
+
+// DownloadFile with chunk support
+message DownloadFileRequest {
+  string repo = 1;
+  string path = 2;
+  string if_none_match = 3;  // For conditional download
+  int64 offset = 4;          // Resume download from byte offset
+  int64 length = 5;          // Number of bytes to download (optional)
+}
+
+message DownloadFileResponse {
+  oneof response {
+    FileInfo info = 1;
+    bytes chunk = 2;
+    DownloadComplete complete = 3;
+  }
+}
+
+message DownloadComplete {
+  string etag = 1;
+  int64 version = 2;
+}
+
+// GetFileInfo
+message GetFileInfoRequest {
+  string repo = 1;
+  string path = 2;
+}
+
+message GetFileInfoResponse {
+  bool exists = 1;
+  FileInfo info = 2;
+  string error_message = 3;
+}
+
+// ListDirectory
+message ListDirectoryRequest {
+  string repo = 1;
+  string path = 2;
+  bool recursive = 3;
+  int32 max_depth = 4;
+  int32 offset = 5;
+  int32 limit = 6;
+}
+
+message ListDirectoryResponse {
+  repeated FileInfo items = 1;
+  int32 total_count = 2;
+  bool has_more = 3;
+  string error_message = 4;
+}
+
+// CreateDirectory
+message CreateDirectoryRequest {
+  string repo = 1;
+  string path = 2;
+}
+
+message CreateDirectoryResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+// Delete
+message DeleteRequest {
+  string repo = 1;
+  string path = 2;
+  bool recursive = 3;  // For directories
+}
+
+message DeleteResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+// Move
+message MoveRequest {
+  string repo = 1;
+  string source_path = 2;
+  string destination_path = 3;
+  bool overwrite = 4;
+}
+
+message MoveResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+// Copy
+message CopyRequest {
+  string repo = 1;
+  string source_path = 2;
+  string destination_path = 3;
+  bool overwrite = 4;
+}
+
+message CopyResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+// SyncStatus
+message SyncStatusRequest {
+  string repo = 1;
+  string path = 2;
+  string client_etag = 3;  // Client's version of the file
+  int64 client_version = 4;  // Client's version number
+}
+
+message SyncStatusResponse {
+  enum Status {
+    UNKNOWN = 0;
+    SYNCED = 1;
+    MODIFIED = 2;
+    DELETED = 3;
+    CONFLICT = 4;
+    NEW = 5;
+  }
+
+  Status status = 1;
+  FileInfo server_info = 2;
+  string error_message = 3;
+}
+
+// BatchOperation
+message BatchOperationRequest {
+  string repo = 1;
+  repeated BatchItem items = 2;
+}
+
+message BatchItem {
+  oneof operation {
+    UploadFileRequest upload = 1;
+    DownloadFileRequest download = 2;
+    DeleteRequest delete = 3;
+    MoveRequest move = 4;
+    CopyRequest copy = 5;
+    GetFileInfoRequest get_info = 6;
+    CreateDirectoryRequest create_dir = 7;
+    BeginUploadRequest begin_upload = 8;
+    UploadChunkRequest upload_chunk = 9;
+    FinalizeUploadRequest finalize_upload = 10;
+    ListChangesRequest list_changes = 11;
+    GetCurrentVersionRequest get_version = 12;
+  }
+}
+
+message BatchOperationResponse {
+  repeated BatchResult results = 1;
+  string error_message = 2;
+}
+
+message BatchResult {
+  int32 index = 1;  // Index in the original request
+  bool success = 2;
+  string result_data = 3;  // Serialized response for the specific operation
+  string error_message = 4;
+}
