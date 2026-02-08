@@ -1,0 +1,393 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "File Hub API Data Models",
+  "description": "JSON Schema definitions for File Hub API data models",
+  "definitions": {
+    "User": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "Unique username for the user"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Email address of the user"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "First name of the user",
+          "nullable": true
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Last name of the user",
+          "nullable": true
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Indicates if the user account is active"
+        },
+        "isAdmin": {
+          "type": "boolean",
+          "description": "Indicates if the user has administrative privileges"
+        }
+      },
+      "required": ["username", "email", "isActive", "isAdmin"],
+      "additionalProperties": false
+    },
+    "FileObject": {
+      "type": "object",
+      "properties": {
+        "repoName": {
+          "type": "string",
+          "description": "Name of the repository containing the file"
+        },
+        "path": {
+          "type": "string",
+          "description": "Full path to the file/directory"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the file/directory"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Size of the file in bytes"
+        },
+        "isDir": {
+          "type": "boolean",
+          "description": "Indicates if the object is a directory"
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "MIME type of the file",
+          "nullable": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "ETag for content verification",
+          "nullable": true
+        },
+        "modTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last modification time"
+        },
+        "isDownloaded": {
+          "type": "boolean",
+          "description": "Indicates if the file is downloaded locally",
+          "default": false
+        },
+        "isDirty": {
+          "type": "boolean",
+          "description": "Indicates if the file has local changes",
+          "default": false
+        }
+      },
+      "required": ["repoName", "path", "name", "size", "isDir", "modTime"],
+      "additionalProperties": false
+    },
+    "ChangeLog": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": ["create", "modify", "delete", "move", "copy"],
+          "description": "Type of operation performed"
+        },
+        "path": {
+          "type": "string",
+          "description": "Path affected by the operation"
+        },
+        "oldPath": {
+          "type": "string",
+          "description": "Previous path for move/copy operations",
+          "nullable": true
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Time when the change occurred"
+        },
+        "version": {
+          "type": "string",
+          "description": "Version associated with the change"
+        }
+      },
+      "required": ["operation", "path", "timestamp", "version"],
+      "additionalProperties": false
+    },
+    "UploadSession": {
+      "type": "object",
+      "properties": {
+        "uploadId": {
+          "type": "string",
+          "description": "Unique identifier for the upload session"
+        },
+        "totalChunks": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total number of chunks expected"
+        },
+        "chunkSize": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Size of each chunk in bytes"
+        },
+        "uploadedChunks": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "List of chunk indices that have been uploaded"
+        }
+      },
+      "required": ["uploadId", "totalChunks", "chunkSize", "uploadedChunks"],
+      "additionalProperties": false
+    },
+    "SyncState": {
+      "type": "object",
+      "properties": {
+        "repoName": {
+          "type": "string",
+          "description": "Name of the repository"
+        },
+        "lastSyncedVersion": {
+          "type": "string",
+          "description": "Version of the repository at last sync"
+        },
+        "lastSyncedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Time of last synchronization"
+        },
+        "pendingUploads": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of pending uploads"
+        },
+        "pendingDownloads": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of pending downloads"
+        }
+      },
+      "required": ["repoName", "lastSyncedVersion", "lastSyncedAt", "pendingUploads", "pendingDownloads"],
+      "additionalProperties": false
+    },
+    "RepositoryVersionResponse": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "Current version of the repository"
+        },
+        "vector": {
+          "type": "string",
+          "description": "Version vector for conflict resolution"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the version"
+        }
+      },
+      "required": ["version", "vector", "timestamp"],
+      "additionalProperties": false
+    },
+    "ChangesResponse": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "Version of the changes"
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ChangeLog"
+          },
+          "description": "List of changes since the last sync"
+        },
+        "changed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of changes in the response"
+        }
+      },
+      "required": ["version", "changes", "changed"],
+      "additionalProperties": false
+    },
+    "FileInfoResponse": {
+      "type": "object",
+      "properties": {
+        "exists": {
+          "type": "boolean",
+          "description": "Indicates if the file exists"
+        },
+        "info": {
+          "$ref": "#/definitions/FileObject",
+          "description": "File information if exists",
+          "nullable": true
+        },
+        "message": {
+          "type": "string",
+          "description": "Additional message",
+          "nullable": true
+        }
+      },
+      "required": ["exists"],
+      "additionalProperties": false
+    },
+    "ListDirectoryResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FileObject"
+          },
+          "description": "List of files/directories in the directory"
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of items available"
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Offset of the current page"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of items per page"
+        },
+        "has_more": {
+          "type": "boolean",
+          "description": "Indicates if there are more items available"
+        }
+      },
+      "required": ["items", "total", "offset", "limit", "has_more"],
+      "additionalProperties": false
+    },
+    "UploadResponse": {
+      "type": "object",
+      "properties": {
+        "etag": {
+          "type": "string",
+          "description": "ETag of the uploaded file"
+        },
+        "version": {
+          "type": "string",
+          "description": "Version of the repository after upload"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Size of the uploaded file"
+        }
+      },
+      "required": ["etag", "version", "size"],
+      "additionalProperties": false
+    },
+    "BeginUploadResponse": {
+      "type": "object",
+      "properties": {
+        "upload_id": {
+          "type": "string",
+          "description": "Unique identifier for the upload session"
+        },
+        "total_chunks": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total number of chunks expected"
+        },
+        "chunk_size": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Size of each chunk in bytes"
+        },
+        "uploaded_chunks": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "List of chunk indices that have been uploaded"
+        }
+      },
+      "required": ["upload_id", "total_chunks", "chunk_size", "uploaded_chunks"],
+      "additionalProperties": false
+    },
+    "UploadChunkResponse": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Indicates if the chunk upload was successful"
+        },
+        "message": {
+          "type": "string",
+          "description": "Additional message",
+          "nullable": true
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    },
+    "FinalizeUploadResponse": {
+      "type": "object",
+      "properties": {
+        "etag": {
+          "type": "string",
+          "description": "ETag of the final uploaded file"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Size of the final uploaded file"
+        }
+      },
+      "required": ["etag", "size"],
+      "additionalProperties": false
+    },
+    "CancelUploadResponse": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Indicates if the upload cancellation was successful"
+        },
+        "message": {
+          "type": "string",
+          "description": "Additional message",
+          "nullable": true
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    },
+    "GenericResponse": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Indicates if the operation was successful"
+        },
+        "message": {
+          "type": "string",
+          "description": "Additional message",
+          "nullable": true
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  }
+}
