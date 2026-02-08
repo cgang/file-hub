@@ -204,6 +204,7 @@ These conventions apply across all technologies and components in the project:
 - Use imperative mood (e.g., "Add feature" not "Added feature" or "Adds feature")
 - Limit subject line to 50 characters when possible
 - Add a blank line followed by a detailed description only when necessary
+- Add `Co-authored-by:` lines in the commit message body to acknowledge all AI agents and assistants involved.
 
 ### Language-Specific Patterns
 
@@ -357,3 +358,4 @@ When implementing the Protocol Buffer-based sync protocol:
 - **Configurable storage**: Support for local filesystem and cloud storage
 
 This document serves as context for AI agents working on the File Hub project, providing comprehensive guidance on architecture, patterns, and development workflows while avoiding duplication of project documentation found in README.md, docs/CONTRIBUTING.md, and other documentation files.
+
