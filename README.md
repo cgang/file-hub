@@ -26,6 +26,7 @@ A personal file backup and synchronization service with WebDAV support, PostgreS
 - Binary diff algorithm for bandwidth optimization
 - Conflict resolution strategy
 - WebDAV protocol implementation
+- Protocol Buffer-based sync protocol for mobile-optimized synchronization (planned)
 
 ### 🔐 Security
 - End-to-end encryption for data in transit and at rest

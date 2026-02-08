@@ -60,8 +60,9 @@ The system follows a clean separation of concerns:
 2. **Database**: PostgreSQL for metadata storage using Bun ORM
 3. **Storage**: Dual backend support (local filesystem and AWS S3)
 4. **Protocol**: Full WebDAV implementation with PROPFIND, PUT, DELETE, MKCOL, COPY, MOVE
-5. **Authentication**: HTTP Basic and Digest authentication with session management
-6. **Frontend**: Modern Svelte-based web interface served from the same binary
+5. **Sync Protocol**: Protocol Buffer-based sync protocol for mobile-optimized synchronization (planned)
+6. **Authentication**: HTTP Basic and Digest authentication with session management
+7. **Frontend**: Modern Svelte-based web interface served from the same binary
 
 ## Technology Stack
 
@@ -332,6 +333,14 @@ Use the component structure and state management patterns demonstrated in the ex
 
 ### Database Operations
 Apply the ORM usage patterns and error handling strategies outlined in the database section.
+
+### Sync Protocol Implementation
+When implementing the Protocol Buffer-based sync protocol:
+- Place sync protocol related code in a new `pkg/sync/` directory
+- Define Protocol Buffer files in `api/proto/` directory and generate Go code
+- Implement the service interface defined in the protocol specification
+- Follow the same error handling and context patterns as the rest of the codebase
+- Ensure authentication tokens work consistently with the existing WebDAV implementation
 
 ## Project Goals and Strategic Principles
 
