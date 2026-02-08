@@ -74,9 +74,9 @@ func TestCreateDigestChallenge(t *testing.T) {
 }
 
 func TestParseDigestAuth(t *testing.T) {
-	authStr := `Digest username="testuser", realm="test", nonce="abc123", uri="/test", qop="auth", nc=00000001, cnonce="def456", response="responsehash", opaque="opaquevalue", algorithm="MD5"`
+	digestCreds := `username="testuser", realm="test", nonce="abc123", uri="/test", qop="auth", nc=00000001, cnonce="def456", response="responsehash", opaque="opaquevalue", algorithm="MD5"`
 
-	digest, err := parseDigestAuth(authStr)
+	digest, err := parseDigestAuth(digestCreds)
 	if err != nil {
 		t.Fatalf("Failed to parse digest auth: %v", err)
 	}

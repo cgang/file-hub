@@ -85,7 +85,7 @@ func TestCreateResponseSpecificProps(t *testing.T) {
 	// Create a prop request for specific properties
 	propfindReq := &PropfindRequest{
 		Prop: &PropfindProp{
-			DisplayName:  &struct{}{},
+			DisplayName:   &struct{}{},
 			ContentLength: &struct{}{},
 		},
 	}
@@ -125,7 +125,7 @@ func TestCreateResponseDirectory(t *testing.T) {
 	assert.Equal(t, "/testdir/", response.Href)
 	assert.Equal(t, "testdir", response.Propstat.Prop.DisplayName)
 	assert.Equal(t, modTime.UTC().Format(time.RFC1123), response.Propstat.Prop.LastModified)
-	assert.Equal(t, "<D:collection/>", response.Propstat.Prop.ResourceType)
+	assert.Equal(t, "<D:collection/>", response.Propstat.Prop.ResourceType.XmlData)
 	assert.Equal(t, "httpd/unix-directory", response.Propstat.Prop.ContentType)
 	assert.Empty(t, response.Propstat.Prop.Length) // Directories don't have content length
 	assert.Equal(t, "HTTP/1.1 200 OK", response.Propstat.Status)
