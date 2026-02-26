@@ -204,7 +204,6 @@ These conventions apply across all technologies and components in the project:
 - Use imperative mood (e.g., "Add feature" not "Added feature" or "Adds feature")
 - Limit subject line to 50 characters when possible
 - Add a blank line followed by a detailed description only when necessary
-- Add `Co-authored-by:` lines in the commit message body to acknowledge all AI agents and assistants involved.
 
 #### 7. Compatibility Considerations Pre-v1.0.0
 - Ignore backward compatibility concerns before formal v1.0.0 release
