@@ -1,11 +1,14 @@
 package sync
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/cgang/file-hub/pkg/db"
@@ -19,16 +22,34 @@ const (
 	MaxSimpleUploadSize = 10 * 1024 * 1024 // 10MB
 	ChunkSize           = 1024 * 1024      // 1MB chunks
 	MaxConnectionTime   = 24 * time.Hour
+	ChunkTempDir        = "chunks"
 )
 
 type Service struct {
-	db *bun.DB
+	db        *bun.DB
+	chunkTempDir string
 }
 
 func NewService(database *bun.DB) *Service {
-	return &Service{
-		db: database,
+	// Create chunk temp directory if it doesn't exist
+	tempDir := filepath.Join(os.TempDir(), ChunkTempDir)
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		// Log but don't fail - will use fallback
+		tempDir = ""
 	}
+	
+	return &Service{
+		db:        database,
+		chunkTempDir: tempDir,
+	}
+}
+
+// getChunkTempPath returns the temporary file path for a chunk
+func (s *Service) getChunkTempPath(uploadID string, chunkIndex int) string {
+	if s.chunkTempDir == "" {
+		return ""
+	}
+	return filepath.Join(s.chunkTempDir, fmt.Sprintf("%s_%d", uploadID, chunkIndex))
 }
 
 func generateVersion() string {
@@ -254,8 +275,31 @@ func (s *Service) UploadFile(ctx context.Context, repo *model.Repository, path s
 		Path: path,
 	}
 
-	if err := stor.PutFile(ctx, resource, nil); err != nil {
-		return "", "", 0, err
+	// Write file content to storage
+	if err := stor.PutFile(ctx, resource, io.NopCloser(bytes.NewReader(data))); err != nil {
+		return "", "", 0, fmt.Errorf("failed to store file: %w", err)
+	}
+
+	// Get file info after storing
+	fileInfo, err := stor.GetFileInfo(ctx, resource)
+	if err != nil {
+		return "", "", 0, fmt.Errorf("failed to get file info: %w", err)
+	}
+
+	// Update database with file metadata
+	fileObj := &model.FileObject{
+		RepoID:    repo.ID,
+		Path:      path,
+		Name:      filepath.Base(path),
+		IsDir:     false,
+		Size:      fileInfo.Size,
+		ModTime:   time.Now(),
+		Checksum:  &checksum,
+		MimeType:  &mimeType,
+	}
+
+	if err := db.UpsertFile(ctx, fileObj); err != nil {
+		return "", "", 0, fmt.Errorf("failed to update database: %w", err)
 	}
 
 	version := generateVersion()
@@ -275,7 +319,7 @@ func (s *Service) UploadFile(ctx context.Context, repo *model.Repository, path s
 		return "", "", 0, fmt.Errorf("failed to update repository version: %w", err)
 	}
 
-	return checksum, version, int64(len(data)), nil
+	return checksum, version, fileInfo.Size, nil
 }
 
 func (s *Service) DownloadFile(ctx context.Context, repo *model.Repository, path string, ifNoneMatch string, userID int) (*model.FileObject, io.ReadCloser, error) {
@@ -338,6 +382,14 @@ func (s *Service) UploadChunk(ctx context.Context, uploadID string, chunkIndex i
 		return fmt.Errorf("upload session has expired")
 	}
 
+	// Store chunk data temporarily
+	chunkPath := s.getChunkTempPath(uploadID, chunkIndex)
+	if chunkPath != "" {
+		if err := os.WriteFile(chunkPath, data, 0644); err != nil {
+			return fmt.Errorf("failed to store chunk data: %w", err)
+		}
+	}
+
 	checksum := calculateSHA256(data)
 	chunk := &model.UploadChunk{
 		UploadID:   uploadID,
@@ -348,6 +400,10 @@ func (s *Service) UploadChunk(ctx context.Context, uploadID string, chunkIndex i
 	}
 
 	if err := db.CreateUploadChunk(ctx, chunk); err != nil {
+		// Clean up stored chunk on error
+		if chunkPath != "" {
+			os.Remove(chunkPath)
+		}
 		return fmt.Errorf("failed to store chunk: %w", err)
 	}
 
@@ -373,13 +429,65 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string, repo *mod
 		return "", 0, fmt.Errorf("not all chunks uploaded: %d/%d", len(chunks), session.TotalChunks)
 	}
 
+	// Verify all chunks are present and assemble file
+	var assembledData bytes.Buffer
+	for i := 0; i < session.TotalChunks; i++ {
+		chunkPath := s.getChunkTempPath(uploadID, i)
+		if chunkPath != "" {
+			data, err := os.ReadFile(chunkPath)
+			if err != nil {
+				return "", 0, fmt.Errorf("failed to read chunk %d: %w", i, err)
+			}
+			assembledData.Write(data)
+		} else {
+			// Chunk not found in temp storage
+			return "", 0, fmt.Errorf("chunk %d not found", i)
+		}
+	}
+
+	// Calculate final checksum
+	finalData := assembledData.Bytes()
+	checksum := calculateSHA256(finalData)
+
+	// Write assembled file to storage
+	resource := &model.Resource{
+		Repo: repo,
+		Path: session.Path,
+	}
+
+	if err := stor.PutFile(ctx, resource, io.NopCloser(bytes.NewReader(finalData))); err != nil {
+		return "", 0, fmt.Errorf("failed to store assembled file: %w", err)
+	}
+
+	// Update database with file metadata
+	fileObj := &model.FileObject{
+		RepoID:   repo.ID,
+		Path:     session.Path,
+		Name:     filepath.Base(session.Path),
+		IsDir:    false,
+		Size:     session.TotalSize,
+		ModTime:  time.Now(),
+		Checksum: &checksum,
+	}
+
+	if err := db.UpsertFile(ctx, fileObj); err != nil {
+		return "", 0, fmt.Errorf("failed to update database: %w", err)
+	}
+
+	// Clean up temporary chunk files
+	for i := 0; i < session.TotalChunks; i++ {
+		chunkPath := s.getChunkTempPath(uploadID, i)
+		if chunkPath != "" {
+			os.Remove(chunkPath)
+		}
+	}
+
+	// Update session status
 	if err := db.UpdateUploadSessionStatus(ctx, uploadID, "completed"); err != nil {
 		return "", 0, fmt.Errorf("failed to update session status: %w", err)
 	}
 
-	fileSize := session.TotalSize
-	checksum := "finalized-" + uuid.New().String()[:8]
-
+	// Record change in change log
 	version := generateVersion()
 	change := &model.ChangeLog{
 		RepoID:    session.RepoID,
@@ -397,10 +505,22 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string, repo *mod
 		return "", 0, fmt.Errorf("failed to update repository version: %w", err)
 	}
 
-	return checksum, fileSize, nil
+	return checksum, session.TotalSize, nil
 }
 
 func (s *Service) CancelUpload(ctx context.Context, uploadID string) error {
+	// Get session to find chunks to clean up
+	session, err := db.GetUploadSession(ctx, uploadID)
+	if err == nil && session != nil {
+		// Clean up any stored chunks
+		for i := 0; i < session.TotalChunks; i++ {
+			chunkPath := s.getChunkTempPath(uploadID, i)
+			if chunkPath != "" {
+				os.Remove(chunkPath)
+			}
+		}
+	}
+
 	if err := db.UpdateUploadSessionStatus(ctx, uploadID, "cancelled"); err != nil {
 		return fmt.Errorf("failed to cancel upload: %w", err)
 	}

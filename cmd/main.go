@@ -31,6 +31,13 @@ func main() {
 
 	web.Start(ctx, cfg)
 
+	// Start gRPC server if configured
+	if cfg.Web.GRPCPort > 0 {
+		if err := web.StartGRPCServer(cfg.Web.GRPCPort); err != nil {
+			log.Printf("Warning: Failed to start gRPC server: %v", err)
+		}
+	}
+
 	// wait for termination signal
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -39,6 +46,15 @@ func main() {
 	log.Printf("Received signal %s, shutting down...", sig)
 
 	web.Stop(ctx)
+
+	// Stop gRPC server
+	if cfg.Web.GRPCPort > 0 {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if err := web.StopGRPCServer(shutdownCtx); err != nil {
+			log.Printf("Error stopping gRPC server: %v", err)
+		}
+		shutdownCancel()
+	}
 
 	cancel()
 
